@@ -856,21 +856,70 @@ export default function MapPage() {
       {/* Painel de condições ambientais (flutuante) */}
       <div
         style={{
-          position: 'absolute', right: 12, bottom: 12, zIndex: 1000,
-          background: 'rgba(255,255,255,0.9)', backdropFilter: 'blur(6px)',
-          border: '1px solid #e5e7eb', borderRadius: 12, padding: 10, minWidth: 260,
-          boxShadow: '0 6px 16px rgba(0,0,0,.08)'
+          position: isNarrow ? 'fixed' : 'absolute',
+          right: isNarrow ? 8 : 16,
+          left: isNarrow ? 8 : 'auto',
+          bottom: isNarrow ? 8 : 16,
+          zIndex: 1000,
+          color: '#0f172a',
+          background: 'linear-gradient(180deg, rgba(255,255,255,0.98), rgba(255,255,255,0.92))',
+          backdropFilter: 'blur(8px)',
+          border: '1px solid #e2e8f0',
+          borderRadius: 14,
+          padding: envCollapsed ? 8 : 12,
+          minWidth: isNarrow ? 'auto' : 280,
+          maxWidth: isNarrow ? 'calc(100vw - 16px)' : 360,
+          boxShadow: '0 10px 30px rgba(2,6,23,.12)',
+          transition: 'all 0.3s ease',
+          opacity: 0.6, // Transparente por padrão
         }}
+        onMouseEnter={(e) => e.currentTarget.style.opacity = '1'} // Opaco ao passar o mouse
+        onMouseLeave={(e) => e.currentTarget.style.opacity = '0.6'} // Volta transparente
       >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-          <strong>Condições ambientais</strong>
-          <button
-            onClick={() => fetchEnvInfo(centerRef.current.lat, centerRef.current.lng)}
-            disabled={loadingEnv}
-            style={{ padding: '4px 8px', border: '1px solid #e5e7eb', borderRadius: 8, background: '#f8fafc', cursor: 'pointer' }}
-          >
-            {loadingEnv ? 'Atualizando…' : 'Atualizar (centro)'}
-          </button>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span aria-hidden="true">🌤️</span>
+            <strong style={{ fontSize: 14 }}>Condições ambientais</strong>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            {/* NOVO: botão minimizar/expandir */}
+            <button
+              type="button"
+              onClick={() => setEnvCollapsed(v => !v)}
+              aria-expanded={!envCollapsed}
+              aria-controls="env-panel-content"
+              title={envCollapsed ? 'Expandir' : 'Minimizar'}
+              style={{
+                padding: '6px 10px',
+                border: '1px solid #cbd5e1',
+                borderRadius: 10,
+                background: '#ffffff',
+                color: '#0f172a',
+                fontSize: 12,
+                cursor: 'pointer'
+              }}
+            >
+              {envCollapsed ? 'Expandir' : 'Minimizar'}
+            </button>
+
+            <button
+              onClick={() => fetchEnvInfo(centerRef.current.lat, centerRef.current.lng)}
+              disabled={loadingEnv}
+              style={{
+                padding: '6px 10px',
+                border: '1px solid #cbd5e1',
+                borderRadius: 10,
+                background: loadingEnv ? '#e2e8f0' : '#f8fafc',
+                color: '#0f172a',
+                fontSize: 12,
+                cursor: loadingEnv ? 'default' : 'pointer'
+              }}
+              title="Atualizar pelas coordenadas do centro do mapa"
+            >
+              {loadingEnv ? 'Atualizando…' : 'Atualizar (centro)'}
+            </button>
+          </div>
         </div>
 
         {/* NOVO: conteúdo colapsável */}
@@ -1022,7 +1071,7 @@ export default function MapPage() {
               </div>
 
               {/* Atualizado em */}
-              <div style={{ fontSize: 11, color: '#94a3b8', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div style={{ fontSize: 11, color: '#8ca1bfff', display: 'flex', alignItems: 'center', gap: 6 }}>
                 <span
                   aria-hidden="true"
                   style={{
