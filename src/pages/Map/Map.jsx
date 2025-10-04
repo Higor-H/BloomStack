@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import './Map.css'
+import Camera from '../Camera/Camera.jsx' // NOVO: componente de câmera
 
 // "Prefixo" para simular arquivos JSON no storage (uma chave por arquivo)
 const STORE_PREFIX = 'bloomstack.points/'
@@ -30,7 +31,7 @@ function genId() {
 }
 
 // Salva um ponto como JSON em uma chave separada do localStorage (agora com slug, foto e descrição)
-function savePointToStorage({ lat, lng, label }) {
+function savePointToStorage({ lat, lng, label, description, photoUrl }) {
   const id = genId()
   const all = loadPointsFromStorage()
   const baseSlug = slugify(label) || `p-${lat.toFixed(5)}-${lng.toFixed(5)}`
@@ -39,7 +40,8 @@ function savePointToStorage({ lat, lng, label }) {
     id, slug, lat, lng,
     label: label || '',
     createdAt: new Date().toISOString(),
-    photoUrl: '', description: ''
+    photoUrl: photoUrl || '',
+    description: description || ''
   }
   try {
     localStorage.setItem(`${STORE_PREFIX}${id}.json`, JSON.stringify(doc))
@@ -165,6 +167,228 @@ export default function MapPage() {
   const [showBoundaries, setShowBoundaries] = useState(true) // NOVO: controle de exibição
   const [envInfo, setEnvInfo] = useState(null)
   const [loadingEnv, setLoadingEnv] = useState(false)
+
+  // NOVO: refs e estados para captura de foto
+  const cameraInputRef = useRef(null)
+  const uploadInputRef = useRef(null)
+  const pendingCoordRef = useRef(null) // NOVO: fonte da verdade da coordenada selecionada
+  const [pendingCoord, setPendingCoord] = useState(null) // {lat,lng}
+  const [captureOpen, setCaptureOpen] = useState(false)
+  const [photoDataUrl, setPhotoDataUrl] = useState('')
+  const [photoExifCoord, setPhotoExifCoord] = useState(null) // {lat,lng}
+  const [descDraft, setDescDraft] = useState('')
+  const [titleDraft, setTitleDraft] = useState('')
+
+  // NOVO: controle do componente de câmera
+  const [cameraOpen, setCameraOpen] = useState(false)
+
+  // Util: ler arquivo, reduzir e retornar dataURL
+  async function fileToDataUrlResized(file, maxW = 1280, maxH = 1280) {
+    const dataUrl = await new Promise((resolve, reject) => {
+      const r = new FileReader()
+      r.onload = () => resolve(r.result)
+      r.onerror = reject
+      r.readAsDataURL(file)
+    })
+    // cria imagem e canvas
+    const img = await new Promise((resolve, reject) => {
+      const i = new Image()
+      i.onload = () => resolve(i)
+      i.onerror = reject
+      i.src = dataUrl
+    })
+    let { width, height } = img
+    const ratio = Math.min(maxW / width, maxH / height, 1)
+    const w = Math.round(width * ratio)
+    const h = Math.round(height * ratio)
+    const canvas = document.createElement('canvas')
+    canvas.width = w; canvas.height = h
+    const ctx = canvas.getContext('2d')
+    ctx.drawImage(img, 0, 0, w, h)
+    return canvas.toDataURL('image/jpeg', 0.85)
+  }
+
+  // Util: tentar extrair GPS via EXIF (exifr ESM por CDN)
+  async function extractExifLatLng(file) {
+    try {
+      const exifr = await import('https://unpkg.com/exifr/dist/full.esm.js')
+      const gps = await exifr.gps(file)
+      if (gps && typeof gps.latitude === 'number' && typeof gps.longitude === 'number') {
+        return { lat: gps.latitude, lng: gps.longitude }
+      }
+    } catch (e) {
+      console.warn('EXIF/GPS não disponível', e)
+    }
+    return null
+  }
+
+  // Processamento comum do arquivo (câmera ou upload)
+  async function processSelectedFile(file) {
+    // usa o ref para evitar corrida com setState
+    const coord = pendingCoordRef.current
+    if (!file || !coord) return
+    const [dataUrl, exifCoord] = await Promise.all([
+      fileToDataUrlResized(file),
+      extractExifLatLng(file)
+    ])
+    setPhotoDataUrl(dataUrl)
+    setPhotoExifCoord(exifCoord)
+    if (exifCoord) {
+      const replace = confirm('A foto possui coordenadas no EXIF. Deseja substituir pelas coordenadas da foto?')
+      if (replace) {
+        pendingCoordRef.current = exifCoord
+        setPendingCoord(exifCoord) // sincroniza para exibir na UI do modal
+      }
+    }
+    setCaptureOpen(true)
+  }
+
+  async function onCameraChange(e) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    await processSelectedFile(file)
+  }
+  async function onUploadChange(e) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    await processSelectedFile(file)
+  }
+
+  // Captura de foto pela câmera (getUserMedia)
+  function startCameraCapture(coord) {
+    // aceita coord explícita e usa ref para não depender do estado ainda não comitado
+    if (coord) {
+      pendingCoordRef.current = coord
+      setPendingCoord(coord) // opcional: mantém UI em sincronia
+    }
+    if (!pendingCoordRef.current) return
+    setCameraOpen(true)
+  }
+
+  async function handleCameraCapture(blob) {
+    try {
+      const file = blob instanceof File ? blob : new File([blob], 'capture.jpg', { type: blob?.type || 'image/jpeg' })
+      await processSelectedFile(file)
+    } finally {
+      setCameraOpen(false)
+    }
+  }
+
+  function handleCameraClose() {
+    setCameraOpen(false)
+  }
+
+  // Popup ao clicar no mapa para oferecer: Bater foto ou Upload
+  function openAddPointPopup(latlng) {
+    // atualiza ref e estado imediatamente
+    const coord = { lat: latlng.lat, lng: latlng.lng }
+    pendingCoordRef.current = coord
+    setPendingCoord(coord)
+
+    const wrap = document.createElement('div')
+    wrap.style.minWidth = '200px'
+
+    const title = document.createElement('div')
+    title.style.fontWeight = '600'
+    title.style.marginBottom = '6px'
+    title.textContent = 'Adicionar ponto aqui?'
+    wrap.appendChild(title)
+
+    const coords = document.createElement('div')
+    coords.style.fontSize = '12px'
+    coords.style.color = '#64748b'
+    coords.style.marginBottom = '8px'
+    coords.textContent = `${latlng.lat.toFixed(5)}, ${latlng.lng.toFixed(5)}`
+    wrap.appendChild(coords)
+
+    const row = document.createElement('div')
+    row.style.display = 'flex'
+    row.style.gap = '6px'
+
+    const btnCam = document.createElement('button')
+    btnCam.textContent = 'Bater foto (câmera)'
+    btnCam.style.padding = '4px 8px'
+    btnCam.style.border = '1px solid #e5e7eb'
+    btnCam.style.borderRadius = '6px'
+    btnCam.style.background = '#ecfccb'
+    btnCam.onclick = () => {
+      mapInst.current?.closePopup()
+      // passa a coord explícita para evitar depender do estado
+      startCameraCapture(coord)
+    }
+
+    const btnUpload = document.createElement('button')
+    btnUpload.textContent = 'Fazer upload'
+    btnUpload.style.padding = '4px 8px'
+    btnUpload.style.border = '1px solid #e5e7eb'
+    btnUpload.style.borderRadius = '6px'
+    btnUpload.style.background = '#f8fafc'
+    btnUpload.onclick = () => {
+      mapInst.current?.closePopup()
+      // coord já está no ref; apenas abre o input
+      uploadInputRef.current?.click()
+    }
+
+    const btnCancel = document.createElement('button')
+    btnCancel.textContent = 'Cancelar'
+    btnCancel.style.padding = '4px 8px'
+    btnCancel.style.border = '1px solid #e5e7eb'
+    btnCancel.style.borderRadius = '6px'
+    btnCancel.style.background = '#fee2e2'
+    btnCancel.onclick = () => mapInst.current?.closePopup()
+
+    row.appendChild(btnCam)
+    row.appendChild(btnUpload)
+    row.appendChild(btnCancel)
+    wrap.appendChild(row)
+
+    L.popup().setLatLng(latlng).setContent(wrap).openOn(mapInst.current)
+  }
+
+  // Substitui o antigo handler condicionado por "selectingCoord" – agora sempre mostra popup
+  useEffect(() => {
+    if (!mapInst.current) return
+    const onMapClick = (evt) => {
+      openAddPointPopup(evt.latlng)
+    }
+    mapInst.current.on('click', onMapClick)
+    return () => { mapInst.current && mapInst.current.off('click', onMapClick) }
+  }, [mapInst.current])
+
+  // Tornar o botão "Novo ponto (foto)" apenas um auxílio: instrução para clicar no mapa
+  function startCaptureFlow() {
+    alert('Clique no mapa para escolher a coordenada e selecione “Bater foto” ou “Fazer upload”.')
+    // sem flags; o clique no mapa já abre o popup
+  }
+
+  function cancelCapture() {
+    setCaptureOpen(false)
+    setPhotoDataUrl('')
+    setPhotoExifCoord(null)
+    setDescDraft('')
+    setTitleDraft('')
+    setPendingCoord(null)
+    pendingCoordRef.current = null // NOVO
+  }
+
+  function saveCapturedPoint() {
+    const coord = pendingCoordRef.current // NOVO
+    if (!coord) return cancelCapture()
+    const label = titleDraft?.trim() || '(sem título)'
+    const description = descDraft?.trim() || ''
+    savePointToStorage({
+      lat: coord.lat,
+      lng: coord.lng,
+      label,
+      description,
+      photoUrl: photoDataUrl
+    })
+    setCaptureOpen(false)
+    setPhotoDataUrl(''); setPhotoExifCoord(null); setDescDraft(''); setTitleDraft('')
+    setPendingCoord(null)
+    pendingCoordRef.current = null // NOVO
+    refreshPoints({ pan: true })
+  }
 
   // Buscar dados ambientais (vento, umidade, AQ, pólen) para lat/lng
   async function fetchEnvInfo(lat, lng) {
@@ -301,6 +525,12 @@ export default function MapPage() {
     centerRef.current = map.getCenter()
     map.on('moveend', () => { centerRef.current = map.getCenter() })
 
+    // NOVO: clique no mapa abre popup para adicionar ponto (câmera/upload)
+    const onMapClick = (evt) => {
+      openAddPointPopup(evt.latlng)
+    }
+    map.on('click', onMapClick)
+
     // Geolocalização do usuário (não persiste)
     if ('geolocation' in navigator) {
       navigator.geolocation.getCurrentPosition(
@@ -334,7 +564,11 @@ export default function MapPage() {
     // Carrega e desenha do storage (com slugs/popups de detalhes)
     refreshPoints({ pan: false })
 
-    return () => { map.remove() }
+    return () => {
+      // ...existing cleanup...
+      try { map.off('click', onMapClick) } catch {}
+      map.remove()
+    }
   }, []) // init
 
   // Troca dinâmica da camada base quando o usuário alternar ou mudar a data GIBS
@@ -490,9 +724,93 @@ export default function MapPage() {
         <button type="button" onClick={() => setShowList(true)} style={{ padding: '6px 10px', marginLeft: 8 }}>
           Meus pontos
         </button>
+        {/* Botão para novo fluxo por foto */}
+        <button type="button" onClick={startCaptureFlow} style={{ padding: '6px 10px', background: '#ecfccb', border: '1px solid #e5e7eb', borderRadius: 8 }}>
+          Novo ponto (foto)
+        </button>
       </form>
 
+      {/* Inputs ocultos: câmera (fallback) e upload */}
+      <input
+        ref={cameraInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        onChange={onCameraChange}
+        style={{ display: 'none' }}
+      />
+      <input
+        ref={uploadInputRef}
+        type="file"
+        accept="image/*"
+        onChange={onUploadChange}
+        style={{ display: 'none' }}
+      />
+
       <div ref={mapRef} className="map-root" role="img" aria-label="Mapa com localização e pontos" />
+
+      {/* Componente de câmera */}
+      <Camera
+        open={cameraOpen}
+        onClose={handleCameraClose}
+        onCapture={handleCameraCapture}
+        facingMode="environment"
+      />
+
+      {/* Modal de captura/descrição */}
+      {captureOpen && (
+        <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) cancelCapture() }}>
+          <div className="modal" role="dialog" aria-modal="true" aria-label="Novo ponto por foto">
+            <div className="modal__header">
+              <strong>Novo ponto</strong>
+              <button className="modal__btn" onClick={cancelCapture}>Cancelar</button>
+            </div>
+
+            <div style={{ display: 'grid', gap: 8 }}>
+              <div>
+                <small style={{ color: '#64748b' }}>Coordenadas selecionadas</small><br />
+                <span>{pendingCoord ? `${pendingCoord.lat.toFixed(6)}, ${pendingCoord.lng.toFixed(6)}` : '—'}</span>
+                {photoExifCoord && (
+                  <div style={{ marginTop: 6, fontSize: 12, color: '#64748b' }}>
+                    EXIF: {photoExifCoord.lat.toFixed(6)}, {photoExifCoord.lng.toFixed(6)} (já aplicado se confirmado)
+                  </div>
+                )}
+              </div>
+
+              {photoDataUrl && (
+                <img src={photoDataUrl} alt="Pré-visualização da foto" style={{ width: '100%', borderRadius: 8, border: '1px solid #e5e7eb' }} />
+              )}
+
+              <label style={{ display: 'grid', gap: 6 }}>
+                <span>Título (opcional)</span>
+                <input
+                  type="text"
+                  value={titleDraft}
+                  onChange={(e) => setTitleDraft(e.target.value)}
+                  placeholder="Ex.: Ipê amarelo na praça"
+                  style={{ padding: 8, borderRadius: 8, border: '1px solid #e5e7eb' }}
+                />
+              </label>
+
+              <label style={{ display: 'grid', gap: 6 }}>
+                <span>Descrição</span>
+                <textarea
+                  rows={4}
+                  value={descDraft}
+                  onChange={(e) => setDescDraft(e.target.value)}
+                  placeholder="Escreva uma descrição da flor/local..."
+                  style={{ padding: 8, borderRadius: 8, border: '1px solid #e5e7eb' }}
+                />
+              </label>
+
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                <button className="modal__btn" onClick={cancelCapture}>Cancelar</button>
+                <button className="modal__btn modal__btn--ok" onClick={saveCapturedPoint}>Salvar ponto</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Painel de condições ambientais (flutuante) */}
       <div
