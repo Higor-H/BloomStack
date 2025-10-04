@@ -93,10 +93,66 @@ function removePointFromStorage(id) {
   localStorage.removeItem(`${STORE_PREFIX}${id}.json`)
 }
 
+// Data para NASA GIBS (usa “ontem” para garantir disponibilidade)
+function getGibsDate() {
+  const d = new Date()
+  d.setDate(d.getDate() - 1)
+  return d.toISOString().slice(0, 10)
+}
+// Limites de data GIBS
+const GIBS_MIN_DATE = '2000-02-24'
+function clampGibsDate(str) {
+  if (!str) return getGibsDate()
+  const min = new Date(GIBS_MIN_DATE).getTime()
+  const max = new Date(getGibsDate()).getTime()
+  const t = new Date(str).getTime()
+  if (Number.isNaN(t)) return getGibsDate()
+  if (t < min) return GIBS_MIN_DATE
+  if (t > max) return getGibsDate()
+  return new Date(t).toISOString().slice(0, 10)
+}
+
+// Helpers para camadas base (OSM e NASA GIBS)
+function buildOsmLayer() {
+  return L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '&copy; OpenStreetMap contributors'
+  })
+}
+function buildGibsLayer(date = getGibsDate()) {
+  return L.tileLayer(
+    `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_CorrectedReflectance_TrueColor/default/${date}/GoogleMapsCompatible_Level9/{z}/{y}/{x}.jpg`,
+    { tileSize: 256, minZoom: 1, maxZoom: 9, attribution: 'Imagery © NASA GIBS/ESDIS' }
+  )
+}
+function buildBaseLayer(kind, date) {
+  return kind === 'gibs' ? buildGibsLayer(date) : buildOsmLayer()
+}
+
+// NOVO: overlay de limites (países, estados e cidades) – transparente
+function buildBoundariesOverlay() {
+  return L.tileLayer(
+    'https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
+    {
+      attribution: 'Esri, HERE, Garmin, © OpenStreetMap contributors, and the GIS user community'
+    }
+  )
+}
+
+// Conversão graus -> ponto cardeal simples
+function degToCompass(deg) {
+  if (deg == null || Number.isNaN(deg)) return '—'
+  const dirs = ['N','NNE','NE','ENE','L','ESE','SE','SSE','S','SSO','SO','OSO','O','ONO','NO','NNO'] // L=Les(N/E), O=Oeste
+  return dirs[Math.round(((deg % 360) / 22.5)) % 16]
+}
+
 export default function MapPage() {
   const mapRef = useRef(null)
   const mapInst = useRef(null)
   const userLayer = useRef(null)
+  const baseLayerRef = useRef(null)
+  const boundariesLayerRef = useRef(null) // NOVO: ref da camada de limites
+  const centerRef = useRef({ lat: 0, lng: 0 })
 
   const [lat, setLat] = useState('')
   const [lng, setLng] = useState('')
@@ -104,6 +160,83 @@ export default function MapPage() {
   // NOVO: estado da lista e visibilidade do popup
   const [points, setPoints] = useState([])
   const [showList, setShowList] = useState(false)
+  const [basemap, setBasemap] = useState('gibs') // 'osm' | 'gibs'
+  const [gibsDate, setGibsDate] = useState(getGibsDate()) // nova data selecionável
+  const [showBoundaries, setShowBoundaries] = useState(true) // NOVO: controle de exibição
+  const [envInfo, setEnvInfo] = useState(null)
+  const [loadingEnv, setLoadingEnv] = useState(false)
+
+  // Buscar dados ambientais (vento, umidade, AQ, pólen) para lat/lng
+  async function fetchEnvInfo(lat, lng) {
+    try {
+      setLoadingEnv(true)
+      const tz = 'auto'
+
+      // Clima atual + umidade horária
+      const wUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current_weather=true&hourly=relativehumidity_2m&timezone=${tz}`
+      const [wRes] = await Promise.all([fetch(wUrl)])
+      const w = await wRes.json()
+
+      const windSpeed = w?.current_weather?.windspeed ?? null
+      const windDir = w?.current_weather?.winddirection ?? null
+
+      // Encontrar umidade na hora mais recente
+      let humidity = null
+      try {
+        const times = w?.hourly?.time || []
+        const hums = w?.hourly?.relativehumidity_2m || []
+        if (times.length && hums.length) {
+          const nowIso = new Date().toISOString().slice(0, 13) + ':00'
+          let idx = times.lastIndexOf(nowIso)
+          if (idx < 0) idx = hums.length - 1
+          humidity = hums[idx] ?? null
+        }
+      } catch {}
+
+      // Qualidade do ar (pm2.5, pm10, ozônio)
+      let aq = {}
+      try {
+        const aqUrl = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lng}&hourly=pm2_5,pm10,ozone&timezone=${tz}`
+        const aqRes = await fetch(aqUrl)
+        const aqJson = await aqRes.json()
+        const t = aqJson?.hourly?.time || []
+        const last = t.length ? t.length - 1 : -1
+        aq = {
+          pm25: last >= 0 ? aqJson?.hourly?.pm2_5?.[last] ?? null : null,
+          pm10: last >= 0 ? aqJson?.hourly?.pm10?.[last] ?? null : null,
+          o3:   last >= 0 ? aqJson?.hourly?.ozone?.[last] ?? null : null,
+        }
+      } catch { aq = {} }
+
+      // Pólen (gramíneas/árvores/ervas) – pode não estar disponível em todas regiões
+      let pollen = {}
+      try {
+        const polUrl = `https://pollen-api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&hourly=grass_pollen,tree_pollen,weed_pollen&timezone=${tz}`
+        const polRes = await fetch(polUrl)
+        const polJson = await polRes.json()
+        const t = polJson?.hourly?.time || []
+        const last = t.length ? t.length - 1 : -1
+        pollen = {
+          grass: last >= 0 ? polJson?.hourly?.grass_pollen?.[last] ?? null : null,
+          tree:  last >= 0 ? polJson?.hourly?.tree_pollen?.[last] ?? null : null,
+          weed:  last >= 0 ? polJson?.hourly?.weed_pollen?.[last] ?? null : null,
+        }
+      } catch { pollen = {} }
+
+      setEnvInfo({
+        lat: Number(lat), lng: Number(lng),
+        windSpeed, windDir, humidity,
+        pm25: aq.pm25 ?? null, pm10: aq.pm10 ?? null, o3: aq.o3 ?? null,
+        pollen,
+        at: new Date().toISOString()
+      })
+    } catch (e) {
+      console.warn('Falha ao obter dados ambientais', e)
+      setEnvInfo(null)
+    } finally {
+      setLoadingEnv(false)
+    }
+  }
 
   // NOVO: recarrega pontos do storage e redesenha marcadores (com migração de slug)
   function refreshPoints({ pan = false } = {}) {
@@ -152,12 +285,21 @@ export default function MapPage() {
     const map = L.map(mapRef.current).setView([0, 0], 2)
     mapInst.current = map
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
-      attribution: '&copy; OpenStreetMap contributors'
-    }).addTo(map)
+    // Camada base inicial conforme seleção e data
+    baseLayerRef.current = buildBaseLayer(basemap, gibsDate)
+    baseLayerRef.current.addTo(map)
 
     userLayer.current = L.layerGroup().addTo(map)
+
+    // NOVO: adiciona overlay de limites se habilitado
+    if (showBoundaries) {
+      boundariesLayerRef.current = buildBoundariesOverlay()
+      boundariesLayerRef.current.addTo(map)
+    }
+
+    // Guardar centro do mapa
+    centerRef.current = map.getCenter()
+    map.on('moveend', () => { centerRef.current = map.getCenter() })
 
     // Geolocalização do usuário (não persiste)
     if ('geolocation' in navigator) {
@@ -172,17 +314,51 @@ export default function MapPage() {
           if (Number.isFinite(accuracy)) {
             L.circle(here, { radius: accuracy, color: '#60a5fa', weight: 1, fillOpacity: 0.12 }).addTo(map)
           }
+          centerRef.current = { lat: latitude, lng: longitude }
+          fetchEnvInfo(latitude, longitude)
         },
-        () => console.warn('Não foi possível obter a localização.'),
+        () => {
+          console.warn('Não foi possível obter a localização.')
+          const c = map.getCenter()
+          centerRef.current = c
+          fetchEnvInfo(c.lat, c.lng)
+        },
         { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
       )
+    } else {
+      const c = map.getCenter()
+      centerRef.current = c
+      fetchEnvInfo(c.lat, c.lng)
     }
 
     // Carrega e desenha do storage (com slugs/popups de detalhes)
     refreshPoints({ pan: false })
 
     return () => { map.remove() }
-  }, [])
+  }, []) // init
+
+  // Troca dinâmica da camada base quando o usuário alternar ou mudar a data GIBS
+  useEffect(() => {
+    if (!mapInst.current) return
+    if (baseLayerRef.current) {
+      try { mapInst.current.removeLayer(baseLayerRef.current) } catch {}
+    }
+    baseLayerRef.current = buildBaseLayer(basemap, gibsDate)
+    baseLayerRef.current.addTo(mapInst.current)
+  }, [basemap, gibsDate])
+
+  // NOVO: alternar a camada de limites dinamicamente
+  useEffect(() => {
+    if (!mapInst.current) return
+    if (showBoundaries) {
+      if (!boundariesLayerRef.current) {
+        boundariesLayerRef.current = buildBoundariesOverlay()
+      }
+      boundariesLayerRef.current.addTo(mapInst.current)
+    } else if (boundariesLayerRef.current) {
+      try { mapInst.current.removeLayer(boundariesLayerRef.current) } catch {}
+    }
+  }, [showBoundaries])
 
   // Adiciona ponto e salva, depois redesenha (popups já terão o botão)
   function addPoint(latNum, lngNum, lbl, opts = { save: true, pan: true }) {
@@ -265,6 +441,35 @@ export default function MapPage() {
   return (
     <div className="map-page">
       <form onSubmit={onSubmit} className="map-form" style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+        {/* Alternador de mapa base */}
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ fontSize: 14, color: '#cfdbedff' }}>Visão</span>
+          <select value={basemap} onChange={(e) => setBasemap(e.target.value)} style={{ padding: '6px 8px' }}>
+            <option value="osm">Mapa padrão (OSM)</option>
+            <option value="gibs">Satélite (NASA)</option>
+          </select>
+        </label>
+
+        {/* Seletor de data para o GIBS (default: ontem) */}
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ fontSize: 14, color: '#64748b' }}>Data</span>
+          <input
+            type="date"
+            value={gibsDate}
+            min={GIBS_MIN_DATE}
+            max={getGibsDate()}
+            onChange={(e) => setGibsDate(clampGibsDate(e.target.value))}
+            disabled={basemap !== 'gibs'}
+            style={{ padding: '6px 8px' }}
+          />
+        </label>
+
+        {/* NOVO: switch para limites */}
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ fontSize: 14, color: '#64748b' }}>Limites</span>
+          <input type="checkbox" checked={showBoundaries} onChange={(e) => setShowBoundaries(e.target.checked)} />
+        </label>
+
         <input
           type="text" inputMode="decimal" placeholder="Lat (-90 a 90)"
           value={lat} onChange={(e) => setLat(e.target.value)}
@@ -282,13 +487,65 @@ export default function MapPage() {
         />
         <button type="submit" style={{ padding: '6px 10px' }}>Cadastrar ponto</button>
         <button type="button" onClick={clearPoints} style={{ padding: '6px 10px' }}>Limpar</button>
-        {/* NOVO: botão para abrir popup de lista */}
         <button type="button" onClick={() => setShowList(true)} style={{ padding: '6px 10px', marginLeft: 8 }}>
           Meus pontos
         </button>
       </form>
 
       <div ref={mapRef} className="map-root" role="img" aria-label="Mapa com localização e pontos" />
+
+      {/* Painel de condições ambientais (flutuante) */}
+      <div
+        style={{
+          position: 'absolute', right: 12, bottom: 12, zIndex: 1000,
+          background: 'rgba(255,255,255,0.9)', backdropFilter: 'blur(6px)',
+          border: '1px solid #e5e7eb', borderRadius: 12, padding: 10, minWidth: 260,
+          boxShadow: '0 6px 16px rgba(0,0,0,.08)'
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+          <strong>Condições ambientais</strong>
+          <button
+            onClick={() => fetchEnvInfo(centerRef.current.lat, centerRef.current.lng)}
+            disabled={loadingEnv}
+            style={{ padding: '4px 8px', border: '1px solid #e5e7eb', borderRadius: 8, background: '#f8fafc', cursor: 'pointer' }}
+          >
+            {loadingEnv ? 'Atualizando…' : 'Atualizar (centro)'}
+          </button>
+        </div>
+
+        <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
+          Centro: {centerRef.current.lat.toFixed(4)}, {centerRef.current.lng.toFixed(4)}
+        </div>
+
+        <div style={{ marginTop: 8, display: 'grid', gap: 6 }}>
+          <div>
+            <span style={{ color: '#64748b' }}>Vento: </span>
+            <span>
+              {envInfo?.windSpeed != null ? `${envInfo.windSpeed} km/h` : '—'} • {envInfo?.windDir != null ? `${degToCompass(envInfo.windDir)} (${Math.round(envInfo.windDir)}°)` : '—'}
+            </span>
+          </div>
+          <div>
+            <span style={{ color: '#64748b' }}>Umidade: </span>
+            <span>{envInfo?.humidity != null ? `${envInfo.humidity}%` : '—'}</span>
+          </div>
+          <div>
+            <span style={{ color: '#64748b' }}>Qualidade do ar: </span>
+            <span>PM2.5 {envInfo?.pm25 != null ? `${envInfo.pm25} µg/m³` : '—'}, PM10 {envInfo?.pm10 != null ? `${envInfo.pm10} µg/m³` : '—'}, O₃ {envInfo?.o3 != null ? `${envInfo.o3} µg/m³` : '—'}</span>
+          </div>
+          <div>
+            <span style={{ color: '#64748b' }}>Pólen: </span>
+            <span>
+              {envInfo?.pollen
+                ? `Grama ${envInfo.pollen.grass ?? '—'} • Árvores ${envInfo.pollen.tree ?? '—'} • Ervas ${envInfo.pollen.weed ?? '—'}`
+                : '—'}
+            </span>
+          </div>
+          <div style={{ fontSize: 11, color: '#94a3b8' }}>
+            {envInfo?.at ? `Atualizado: ${new Date(envInfo.at).toLocaleString()}` : ''}
+          </div>
+        </div>
+      </div>
 
       {/* NOVO: Popup com a lista de pontos */}
       {showList && (
