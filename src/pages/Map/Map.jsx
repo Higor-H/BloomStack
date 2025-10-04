@@ -49,6 +49,24 @@ function clearPointsFromStorage() {
   toDel.forEach((k) => localStorage.removeItem(k))
 }
 
+// NOVO: atualizar um ponto no storage
+function updatePointInStorage(id, patch) {
+  const key = `${STORE_PREFIX}${id}.json`
+  const raw = localStorage.getItem(key)
+  if (!raw) return null
+  try {
+    const current = JSON.parse(raw)
+    const next = { ...current, ...patch }
+    localStorage.setItem(key, JSON.stringify(next))
+    return next
+  } catch { return null }
+}
+
+// NOVO: remover um ponto específico do storage
+function removePointFromStorage(id) {
+  localStorage.removeItem(`${STORE_PREFIX}${id}.json`)
+}
+
 export default function MapPage() {
   const mapRef = useRef(null)
   const mapInst = useRef(null)
@@ -57,6 +75,28 @@ export default function MapPage() {
   const [lat, setLat] = useState('')
   const [lng, setLng] = useState('')
   const [label, setLabel] = useState('')
+  // NOVO: estado da lista e visibilidade do popup
+  const [points, setPoints] = useState([])
+  const [showList, setShowList] = useState(false)
+
+  // NOVO: recarrega pontos do storage e redesenha marcadores
+  function refreshPoints({ pan = false } = {}) {
+    const all = loadPointsFromStorage()
+    setPoints(all)
+    if (userLayer.current) {
+      userLayer.current.clearLayers()
+      all.forEach(p => {
+        const m = L.circleMarker([p.lat, p.lng], {
+          radius: 7, color: '#059669', weight: 2, fillColor: '#10b981', fillOpacity: 0.7
+        }).addTo(userLayer.current)
+        if (p.label) m.bindPopup(p.label)
+      })
+      if (pan && all.length && mapInst.current) {
+        const last = all[all.length - 1]
+        mapInst.current.setView([last.lat, last.lng], 15)
+      }
+    }
+  }
 
   useEffect(() => {
     if (!mapRef.current) return
@@ -89,24 +129,26 @@ export default function MapPage() {
       )
     }
 
-    // Carrega pontos salvos do storage e renderiza (sem pan e sem salvar de novo)
-    const saved = loadPointsFromStorage()
-    saved.forEach(p => addPoint(p.lat, p.lng, p.label, { save: false, pan: false }))
+    // SUBSTITUI: Carrega e desenha do storage
+    refreshPoints({ pan: false })
 
     return () => { map.remove() }
   }, [])
 
-  // Adiciona ponto no mapa. Opções:
-  // - save: salva no storage como JSON
-  // - pan: centraliza o mapa no ponto
+  // Adiciona ponto no mapa e salva (mantém funcionalidade)
   function addPoint(latNum, lngNum, lbl, opts = { save: true, pan: true }) {
     if (!mapInst.current || !userLayer.current) return
-    const marker = L.circleMarker([latNum, lngNum], {
-      radius: 7, color: '#059669', weight: 2, fillColor: '#10b981', fillOpacity: 0.7
-    }).addTo(userLayer.current)
-    if (lbl) marker.bindPopup(lbl)
-    if (opts.pan) mapInst.current.setView([latNum, lngNum], 15)
-    if (opts.save) savePointToStorage({ lat: latNum, lng: lngNum, label: lbl })
+    if (opts.save) {
+      savePointToStorage({ lat: latNum, lng: lngNum, label: lbl })
+      refreshPoints({ pan: opts.pan })
+    } else {
+      // ...existing code for non-saved marker if needed...
+      const marker = L.circleMarker([latNum, lngNum], {
+        radius: 7, color: '#059669', weight: 2, fillColor: '#10b981', fillOpacity: 0.7
+      }).addTo(userLayer.current)
+      if (lbl) marker.bindPopup(lbl)
+      if (opts.pan) mapInst.current.setView([latNum, lngNum], 15)
+    }
   }
 
   // Utilitários no console
@@ -130,6 +172,43 @@ export default function MapPage() {
     if (confirm('Também remover os pontos salvos no navegador?')) {
       clearPointsFromStorage()
     }
+    // Após limpar storage (se confirmado), também atualiza lista
+    refreshPoints({ pan: false })
+  }
+
+  // NOVO: focar no mapa
+  function handleShow(id) {
+    const doc = points.find(p => p.id === id)
+    if (!doc || !mapInst.current) return
+    mapInst.current.setView([doc.lat, doc.lng], 15)
+  }
+
+  // NOVO: editar ponto
+  function handleEdit(id) {
+    const doc = points.find(p => p.id === id)
+    if (!doc) return
+    const newLabel = prompt('Rótulo', doc.label || '')
+    if (newLabel === null) return
+    const newLat = prompt('Latitude (-90..90)', String(doc.lat))
+    if (newLat === null) return
+    const newLng = prompt('Longitude (-180..180)', String(doc.lng))
+    if (newLng === null) return
+    const latNum = parseFloat(String(newLat).replace(',', '.'))
+    const lngNum = parseFloat(String(newLng).replace(',', '.'))
+    if (!Number.isFinite(latNum) || !Number.isFinite(lngNum)) return alert('Coordenadas inválidas.')
+    if (latNum < -90 || latNum > 90 || lngNum < -180 || lngNum > 180) return alert('Fora do intervalo válido.')
+    const updated = updatePointInStorage(id, { label: newLabel.trim(), lat: latNum, lng: lngNum })
+    if (!updated) return alert('Falha ao atualizar o ponto.')
+    refreshPoints({ pan: true })
+  }
+
+  // NOVO: excluir ponto
+  function handleDelete(id) {
+    const doc = points.find(p => p.id === id)
+    if (!doc) return
+    if (!confirm(`Excluir o ponto "${doc.label || '(sem rótulo)'}"?`)) return
+    removePointFromStorage(id)
+    refreshPoints({ pan: false })
   }
 
   return (
@@ -152,9 +231,46 @@ export default function MapPage() {
         />
         <button type="submit" style={{ padding: '6px 10px' }}>Cadastrar ponto</button>
         <button type="button" onClick={clearPoints} style={{ padding: '6px 10px' }}>Limpar</button>
+        {/* NOVO: botão para abrir popup de lista */}
+        <button type="button" onClick={() => setShowList(true)} style={{ padding: '6px 10px', marginLeft: 8 }}>
+          Meus pontos
+        </button>
       </form>
 
       <div ref={mapRef} className="map-root" role="img" aria-label="Mapa com localização e pontos" />
+
+      {/* NOVO: Popup com a lista de pontos */}
+      {showList && (
+        <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setShowList(false) }}>
+          <div className="modal" role="dialog" aria-modal="true" aria-label="Pontos cadastrados">
+            <div className="modal__header">
+              <strong>Pontos cadastrados</strong>
+              <button className="modal__btn" onClick={() => setShowList(false)}>Fechar</button>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 6 }}>
+              <small style={{ color: '#64748b' }}>{points.length} itens</small>
+              <button className="modal__btn" onClick={() => refreshPoints({ pan: false })}>Atualizar</button>
+            </div>
+
+            {points.length === 0 && <div style={{ color: '#94a3b8' }}>Nenhum ponto cadastrado.</div>}
+
+            {points.map(p => (
+              <div key={p.id} className="modal__list-item">
+                <div style={{ display: 'grid' }}>
+                  <span style={{ fontWeight: 600 }}>{p.label?.trim() || '(sem rótulo)'}</span>
+                  <small style={{ color: '#64748b' }}>{p.lat.toFixed(5)}, {p.lng.toFixed(5)}</small>
+                </div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button className="modal__btn modal__btn--ok" onClick={() => handleShow(p.id)}>Mostrar</button>
+                  <button className="modal__btn" onClick={() => handleEdit(p.id)}>Editar</button>
+                  <button className="modal__btn modal__btn--warn" onClick={() => handleDelete(p.id)}>Excluir</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
