@@ -495,14 +495,8 @@ export default function MapPage() {
       <div ref={mapRef} className="map-root" role="img" aria-label="Mapa com localização e pontos" />
 
       {/* Painel de condições ambientais (flutuante) */}
-      <div
-        style={{
-          position: 'absolute', right: 12, bottom: 12, zIndex: 1000,
-          background: 'rgba(255,255,255,0.9)', backdropFilter: 'blur(6px)',
-          border: '1px solid #e5e7eb', borderRadius: 12, padding: 10, minWidth: 260,
-          boxShadow: '0 6px 16px rgba(0,0,0,.08)'
-        }}
-      >
+      <div className="mapa-painel">
+        
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
           <strong>Condições ambientais</strong>
           <button
