@@ -5,16 +5,42 @@ import './Map.css'
 
 // "Prefixo" para simular arquivos JSON no storage (uma chave por arquivo)
 const STORE_PREFIX = 'bloomstack.points/'
+// Helpers de slug/escape
+function slugify(s = '') {
+  return String(s)
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase().trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '')
+}
+function ensureUniqueSlug(allDocs, baseSlug, idHint) {
+  let slug = baseSlug || `p-${Date.now()}`
+  const taken = new Set(allDocs.filter(d => d.id !== idHint).map(d => d.slug))
+  let i = 1
+  while (taken.has(slug)) slug = `${baseSlug}-${i++}`
+  return slug
+}
+function escapeHtml(s = '') {
+  return String(s).replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))
+}
 
 // Gera um ID simples para nome de arquivo
 function genId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 }
 
-// Salva um ponto como JSON em uma chave separada do localStorage
+// Salva um ponto como JSON em uma chave separada do localStorage (agora com slug, foto e descrição)
 function savePointToStorage({ lat, lng, label }) {
   const id = genId()
-  const doc = { id, lat, lng, label: label || '', createdAt: new Date().toISOString() }
+  const all = loadPointsFromStorage()
+  const baseSlug = slugify(label) || `p-${lat.toFixed(5)}-${lng.toFixed(5)}`
+  const slug = ensureUniqueSlug(all, baseSlug, id)
+  const doc = {
+    id, slug, lat, lng,
+    label: label || '',
+    createdAt: new Date().toISOString(),
+    photoUrl: '', description: ''
+  }
   try {
     localStorage.setItem(`${STORE_PREFIX}${id}.json`, JSON.stringify(doc))
   } catch (e) {
@@ -49,7 +75,7 @@ function clearPointsFromStorage() {
   toDel.forEach((k) => localStorage.removeItem(k))
 }
 
-// NOVO: atualizar um ponto no storage
+// NOVO: atualizar um ponto no storage (já existente no arquivo)
 function updatePointInStorage(id, patch) {
   const key = `${STORE_PREFIX}${id}.json`
   const raw = localStorage.getItem(key)
@@ -62,7 +88,7 @@ function updatePointInStorage(id, patch) {
   } catch { return null }
 }
 
-// NOVO: remover um ponto específico do storage
+// NOVO: remover um ponto específico do storage (já existente no arquivo)
 function removePointFromStorage(id) {
   localStorage.removeItem(`${STORE_PREFIX}${id}.json`)
 }
@@ -79,22 +105,45 @@ export default function MapPage() {
   const [points, setPoints] = useState([])
   const [showList, setShowList] = useState(false)
 
-  // NOVO: recarrega pontos do storage e redesenha marcadores
+  // NOVO: recarrega pontos do storage e redesenha marcadores (com migração de slug)
   function refreshPoints({ pan = false } = {}) {
-    const all = loadPointsFromStorage()
-    setPoints(all)
-    if (userLayer.current) {
-      userLayer.current.clearLayers()
-      all.forEach(p => {
-        const m = L.circleMarker([p.lat, p.lng], {
-          radius: 7, color: '#059669', weight: 2, fillColor: '#10b981', fillOpacity: 0.7
-        }).addTo(userLayer.current)
-        if (p.label) m.bindPopup(p.label)
-      })
-      if (pan && all.length && mapInst.current) {
-        const last = all[all.length - 1]
-        mapInst.current.setView([last.lat, last.lng], 15)
+    const all = loadPointsFromStorage().map((p) => {
+      if (!p.slug) {
+        const allNoSelf = loadPointsFromStorage().filter(d => d.id !== p.id)
+        const base = p.label ? slugify(p.label) : `p-${p.lat.toFixed(5)}-${p.lng.toFixed(5)}`
+        const slug = ensureUniqueSlug(allNoSelf, base, p.id)
+        const fixed = { ...p, slug }
+        localStorage.setItem(`${STORE_PREFIX}${p.id}.json`, JSON.stringify(fixed))
+        return fixed
       }
+      return p
+    })
+
+    setPoints?.(all) // se existir no arquivo (em versões com lista)
+    if (!userLayer.current) return
+
+    userLayer.current.clearLayers()
+    all.forEach(p => {
+      const m = L.circleMarker([p.lat, p.lng], {
+        radius: 7, color: '#059669', weight: 2, fillColor: '#10b981', fillOpacity: 0.7
+      }).addTo(userLayer.current)
+
+      const html = `
+        <div style="min-width:180px">
+          <div style="font-weight:600;margin-bottom:4px">${escapeHtml(p.label || '(sem rótulo)')}</div>
+          <div style="font-size:12px;color:#64748b;margin-bottom:6px">${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}</div>
+          <a href="/${encodeURIComponent(p.slug)}"
+             style="display:inline-block;padding:4px 8px;border:1px solid #e5e7eb;border-radius:6px;background:#f8fafc;text-decoration:none;color:#111827">
+             Ver detalhes
+          </a>
+        </div>
+      `
+      m.bindPopup(html)
+    })
+
+    if (pan && all.length && mapInst.current) {
+      const last = all[all.length - 1]
+      mapInst.current.setView([last.lat, last.lng], 15)
     }
   }
 
@@ -129,13 +178,13 @@ export default function MapPage() {
       )
     }
 
-    // SUBSTITUI: Carrega e desenha do storage
+    // Carrega e desenha do storage (com slugs/popups de detalhes)
     refreshPoints({ pan: false })
 
     return () => { map.remove() }
   }, [])
 
-  // Adiciona ponto no mapa e salva (mantém funcionalidade)
+  // Adiciona ponto e salva, depois redesenha (popups já terão o botão)
   function addPoint(latNum, lngNum, lbl, opts = { save: true, pan: true }) {
     if (!mapInst.current || !userLayer.current) return
     if (opts.save) {
@@ -146,7 +195,7 @@ export default function MapPage() {
       const marker = L.circleMarker([latNum, lngNum], {
         radius: 7, color: '#059669', weight: 2, fillColor: '#10b981', fillOpacity: 0.7
       }).addTo(userLayer.current)
-      if (lbl) marker.bindPopup(lbl)
+      if (lbl) marker.bindPopup(escapeHtml(lbl))
       if (opts.pan) mapInst.current.setView([latNum, lngNum], 15)
     }
   }
@@ -189,15 +238,17 @@ export default function MapPage() {
     if (!doc) return
     const newLabel = prompt('Rótulo', doc.label || '')
     if (newLabel === null) return
-    const newLat = prompt('Latitude (-90..90)', String(doc.lat))
-    if (newLat === null) return
-    const newLng = prompt('Longitude (-180..180)', String(doc.lng))
-    if (newLng === null) return
+    const newLat = prompt('Latitude (-90..90)', String(doc.lat)); if (newLat === null) return
+    const newLng = prompt('Longitude (-180..180)', String(doc.lng)); if (newLng === null) return
     const latNum = parseFloat(String(newLat).replace(',', '.'))
     const lngNum = parseFloat(String(newLng).replace(',', '.'))
     if (!Number.isFinite(latNum) || !Number.isFinite(lngNum)) return alert('Coordenadas inválidas.')
     if (latNum < -90 || latNum > 90 || lngNum < -180 || lngNum > 180) return alert('Fora do intervalo válido.')
-    const updated = updatePointInStorage(id, { label: newLabel.trim(), lat: latNum, lng: lngNum })
+
+    const others = loadPointsFromStorage().filter(p => p.id !== id)
+    const base = slugify(newLabel)
+    const newSlug = base ? ensureUniqueSlug(others, base, id) : doc.slug
+    const updated = updatePointInStorage(id, { label: newLabel.trim(), lat: latNum, lng: lngNum, slug: newSlug })
     if (!updated) return alert('Falha ao atualizar o ponto.')
     refreshPoints({ pan: true })
   }
