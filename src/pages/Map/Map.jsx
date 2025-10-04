@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import './Map.css'
+import Camera from '../Camera/Camera.jsx' // NOVO: componente de câmera
 
 // "Prefixo" para simular arquivos JSON no storage (uma chave por arquivo)
 const STORE_PREFIX = 'bloomstack.points/'
@@ -30,7 +31,7 @@ function genId() {
 }
 
 // Salva um ponto como JSON em uma chave separada do localStorage (agora com slug, foto e descrição)
-function savePointToStorage({ lat, lng, label }) {
+function savePointToStorage({ lat, lng, label, description, photoUrl }) {
   const id = genId()
   const all = loadPointsFromStorage()
   const baseSlug = slugify(label) || `p-${lat.toFixed(5)}-${lng.toFixed(5)}`
@@ -39,7 +40,8 @@ function savePointToStorage({ lat, lng, label }) {
     id, slug, lat, lng,
     label: label || '',
     createdAt: new Date().toISOString(),
-    photoUrl: '', description: ''
+    photoUrl: photoUrl || '',
+    description: description || ''
   }
   try {
     localStorage.setItem(`${STORE_PREFIX}${id}.json`, JSON.stringify(doc))
@@ -165,6 +167,244 @@ export default function MapPage() {
   const [showBoundaries, setShowBoundaries] = useState(true) // NOVO: controle de exibição
   const [envInfo, setEnvInfo] = useState(null)
   const [loadingEnv, setLoadingEnv] = useState(false)
+
+  // NOVO: refs e estados para captura de foto
+  const cameraInputRef = useRef(null)
+  const uploadInputRef = useRef(null)
+  const pendingCoordRef = useRef(null) // NOVO: fonte da verdade da coordenada selecionada
+  const [pendingCoord, setPendingCoord] = useState(null) // {lat,lng}
+  const [captureOpen, setCaptureOpen] = useState(false)
+  const [photoDataUrl, setPhotoDataUrl] = useState('')
+  const [photoExifCoord, setPhotoExifCoord] = useState(null) // {lat,lng}
+  const [descDraft, setDescDraft] = useState('')
+  const [titleDraft, setTitleDraft] = useState('')
+
+  // NOVO: controle do componente de câmera
+  const [cameraOpen, setCameraOpen] = useState(false)
+  // NOVO: flag de largura da tela para responsividade
+  const [isNarrow, setIsNarrow] = useState(false)
+  // NOVO: minimizar/expandir painel ambiental
+  const [envCollapsed, setEnvCollapsed] = useState(false)
+  const ENV_COLLAPSED_KEY = 'bloomstack.ui/envPanelCollapsed'
+
+  useEffect(() => {
+    const onResize = () => setIsNarrow(window.innerWidth < 768) // < 768px = mobile/tablet pequeno
+    onResize()
+    window.addEventListener('resize', onResize)
+    // NOVO: carrega preferencia do painel
+    try {
+      const saved = localStorage.getItem(ENV_COLLAPSED_KEY)
+      if (saved != null) setEnvCollapsed(saved === '1')
+    } catch {}
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+
+  useEffect(() => {
+    // NOVO: persiste preferencia do painel
+    try { localStorage.setItem(ENV_COLLAPSED_KEY, envCollapsed ? '1' : '0') } catch {}
+  }, [envCollapsed])
+
+  // Util: ler arquivo, reduzir e retornar dataURL
+  async function fileToDataUrlResized(file, maxW = 1280, maxH = 1280) {
+    const dataUrl = await new Promise((resolve, reject) => {
+      const r = new FileReader()
+      r.onload = () => resolve(r.result)
+      r.onerror = reject
+      r.readAsDataURL(file)
+    })
+    // cria imagem e canvas
+    const img = await new Promise((resolve, reject) => {
+      const i = new Image()
+      i.onload = () => resolve(i)
+      i.onerror = reject
+      i.src = dataUrl
+    })
+    let { width, height } = img
+    const ratio = Math.min(maxW / width, maxH / height, 1)
+    const w = Math.round(width * ratio)
+    const h = Math.round(height * ratio)
+    const canvas = document.createElement('canvas')
+    canvas.width = w; canvas.height = h
+    const ctx = canvas.getContext('2d')
+    ctx.drawImage(img, 0, 0, w, h)
+    return canvas.toDataURL('image/jpeg', 0.85)
+  }
+
+  // Util: tentar extrair GPS via EXIF (exifr ESM por CDN)
+  async function extractExifLatLng(file) {
+    try {
+      const exifr = await import('https://unpkg.com/exifr/dist/full.esm.js')
+      const gps = await exifr.gps(file)
+      if (gps && typeof gps.latitude === 'number' && typeof gps.longitude === 'number') {
+        return { lat: gps.latitude, lng: gps.longitude }
+      }
+    } catch (e) {
+      console.warn('EXIF/GPS não disponível', e)
+    }
+    return null
+  }
+
+  // Processamento comum do arquivo (câmera ou upload)
+  async function processSelectedFile(file) {
+    // usa o ref para evitar corrida com setState
+    const coord = pendingCoordRef.current
+    if (!file || !coord) return
+    const [dataUrl, exifCoord] = await Promise.all([
+      fileToDataUrlResized(file),
+      extractExifLatLng(file)
+    ])
+    setPhotoDataUrl(dataUrl)
+    setPhotoExifCoord(exifCoord)
+    if (exifCoord) {
+      const replace = confirm('A foto possui coordenadas no EXIF. Deseja substituir pelas coordenadas da foto?')
+      if (replace) {
+        pendingCoordRef.current = exifCoord
+        setPendingCoord(exifCoord) // sincroniza para exibir na UI do modal
+      }
+    }
+    setCaptureOpen(true)
+  }
+
+  async function onCameraChange(e) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    await processSelectedFile(file)
+  }
+  async function onUploadChange(e) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    await processSelectedFile(file)
+  }
+
+  // Captura de foto pela câmera (getUserMedia)
+  function startCameraCapture(coord) {
+    // aceita coord explícita e usa ref para não depender do estado ainda não comitado
+    if (coord) {
+      pendingCoordRef.current = coord
+      setPendingCoord(coord) // opcional: mantém UI em sincronia
+    }
+    if (!pendingCoordRef.current) return
+    setCameraOpen(true)
+  }
+
+  async function handleCameraCapture(blob) {
+    try {
+      const file = blob instanceof File ? blob : new File([blob], 'capture.jpg', { type: blob?.type || 'image/jpeg' })
+      await processSelectedFile(file)
+    } finally {
+      setCameraOpen(false)
+    }
+  }
+
+  function handleCameraClose() {
+    setCameraOpen(false)
+  }
+
+  // Popup ao clicar no mapa para oferecer: Bater foto ou Upload
+  function openAddPointPopup(latlng) {
+    // atualiza ref e estado imediatamente
+    const coord = { lat: latlng.lat, lng: latlng.lng }
+    pendingCoordRef.current = coord
+    setPendingCoord(coord)
+
+    const wrap = document.createElement('div')
+    wrap.style.minWidth = '200px'
+
+    const title = document.createElement('div')
+    title.style.fontWeight = '600'
+    title.style.marginBottom = '6px'
+    title.textContent = 'Adicionar ponto aqui?'
+    wrap.appendChild(title)
+
+    const coords = document.createElement('div')
+    coords.style.fontSize = '12px'
+    coords.style.color = '#64748b'
+    coords.style.marginBottom = '8px'
+    coords.textContent = `${latlng.lat.toFixed(5)}, ${latlng.lng.toFixed(5)}`
+    wrap.appendChild(coords)
+
+    const row = document.createElement('div')
+    row.style.display = 'flex'
+    row.style.gap = '6px'
+
+    const btnCam = document.createElement('button')
+    btnCam.textContent = 'Bater foto (câmera)'
+    btnCam.style.padding = '4px 8px'
+    btnCam.style.border = '1px solid #e5e7eb'
+    btnCam.style.borderRadius = '6px'
+    btnCam.style.background = '#ecfccb'
+    btnCam.onclick = () => {
+      mapInst.current?.closePopup()
+      // passa a coord explícita para evitar depender do estado
+      startCameraCapture(coord)
+    }
+
+    const btnUpload = document.createElement('button')
+    btnUpload.textContent = 'Fazer upload'
+    btnUpload.style.padding = '4px 8px'
+    btnUpload.style.border = '1px solid #e5e7eb'
+    btnUpload.style.borderRadius = '6px'
+    btnUpload.style.background = '#f8fafc'
+    btnUpload.onclick = () => {
+      mapInst.current?.closePopup()
+      // coord já está no ref; apenas abre o input
+      uploadInputRef.current?.click()
+    }
+
+    const btnCancel = document.createElement('button')
+    btnCancel.textContent = 'Cancelar'
+    btnCancel.style.padding = '4px 8px'
+    btnCancel.style.border = '1px solid #e5e7eb'
+    btnCancel.style.borderRadius = '6px'
+    btnCancel.style.background = '#fee2e2'
+    btnCancel.onclick = () => mapInst.current?.closePopup()
+
+    row.appendChild(btnCam)
+    row.appendChild(btnUpload)
+    row.appendChild(btnCancel)
+    wrap.appendChild(row)
+
+    L.popup().setLatLng(latlng).setContent(wrap).openOn(mapInst.current)
+  }
+
+  // Substitui o antigo handler condicionado por "selectingCoord" – agora sempre mostra popup
+  useEffect(() => {
+    if (!mapInst.current) return
+    const onMapClick = (evt) => {
+      openAddPointPopup(evt.latlng)
+    }
+    mapInst.current.on('click', onMapClick)
+    return () => { mapInst.current && mapInst.current.off('click', onMapClick) }
+  }, [mapInst.current])
+
+  function cancelCapture() {
+    setCaptureOpen(false)
+    setPhotoDataUrl('')
+    setPhotoExifCoord(null)
+    setDescDraft('')
+    setTitleDraft('')
+    setPendingCoord(null)
+    pendingCoordRef.current = null // NOVO
+  }
+
+  function saveCapturedPoint() {
+    const coord = pendingCoordRef.current // NOVO
+    if (!coord) return cancelCapture()
+    const label = titleDraft?.trim() || '(sem título)'
+    const description = descDraft?.trim() || ''
+    savePointToStorage({
+      lat: coord.lat,
+      lng: coord.lng,
+      label,
+      description,
+      photoUrl: photoDataUrl
+    })
+    setCaptureOpen(false)
+    setPhotoDataUrl(''); setPhotoExifCoord(null); setDescDraft(''); setTitleDraft('')
+    setPendingCoord(null)
+    pendingCoordRef.current = null // NOVO
+    refreshPoints({ pan: true })
+  }
 
   // Buscar dados ambientais (vento, umidade, AQ, pólen) para lat/lng
   async function fetchEnvInfo(lat, lng) {
@@ -301,6 +541,12 @@ export default function MapPage() {
     centerRef.current = map.getCenter()
     map.on('moveend', () => { centerRef.current = map.getCenter() })
 
+    // NOVO: clique no mapa abre popup para adicionar ponto (câmera/upload)
+    const onMapClick = (evt) => {
+      openAddPointPopup(evt.latlng)
+    }
+    map.on('click', onMapClick)
+
     // Geolocalização do usuário (não persiste)
     if ('geolocation' in navigator) {
       navigator.geolocation.getCurrentPosition(
@@ -334,7 +580,11 @@ export default function MapPage() {
     // Carrega e desenha do storage (com slugs/popups de detalhes)
     refreshPoints({ pan: false })
 
-    return () => { map.remove() }
+    return () => {
+      // ...existing cleanup...
+      try { map.off('click', onMapClick) } catch {}
+      map.remove()
+    }
   }, []) // init
 
   // Troca dinâmica da camada base quando o usuário alternar ou mudar a data GIBS
@@ -406,6 +656,19 @@ export default function MapPage() {
     const doc = points.find(p => p.id === id)
     if (!doc || !mapInst.current) return
     mapInst.current.setView([doc.lat, doc.lng], 15)
+
+    // Abre popup com nome do ponto (e coords/link)
+    const html = `
+      <div style="min-width:180px">
+        <div style="font-weight:600;margin-bottom:4px">${escapeHtml(doc.label?.trim() || '(sem rótulo)')}</div>
+        <div style="font-size:12px;color:#64748b;margin-bottom:6px">${doc.lat.toFixed(5)}, ${doc.lng.toFixed(5)}</div>
+        <a href="/${encodeURIComponent(doc.slug)}"
+           style="display:inline-block;padding:4px 8px;border:1px solid #e5e7eb;border-radius:6px;background:#f8fafc;text-decoration:none;color:#111827">
+           Ver detalhes
+        </a>
+      </div>
+    `
+    L.popup().setLatLng([doc.lat, doc.lng]).setContent(html).openOn(mapInst.current)
   }
 
   // NOVO: editar ponto
@@ -439,8 +702,12 @@ export default function MapPage() {
   }
 
   return (
-    <div className="map-page">
-      <form onSubmit={onSubmit} className="map-form" style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+    <div className="map-page" style={{ display: 'flex', flexDirection: 'column', height: '100dvh' }}>
+      <form
+        onSubmit={onSubmit}
+        className="map-form"
+        style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', marginBottom: 8 }}
+      >
         {/* Alternador de mapa base */}
         <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <span style={{ fontSize: 14, color: '#cfdbedff' }}>Visão</span>
@@ -473,30 +740,128 @@ export default function MapPage() {
         <input
           type="text" inputMode="decimal" placeholder="Lat (-90 a 90)"
           value={lat} onChange={(e) => setLat(e.target.value)}
-          style={{ padding: '6px 8px' }}
+          style={{ padding: '6px 8px', flex: '1 1 150px', minWidth: 120, boxSizing: 'border-box' }}
         />
         <input
           type="text" inputMode="decimal" placeholder="Lng (-180 a 180)"
           value={lng} onChange={(e) => setLng(e.target.value)}
-          style={{ padding: '6px 8px' }}
+          style={{ padding: '6px 8px', flex: '1 1 150px', minWidth: 120, boxSizing: 'border-box' }}
         />
         <input
           type="text" placeholder="Rótulo (opcional)"
           value={label} onChange={(e) => setLabel(e.target.value)}
-          style={{ padding: '6px 8px' }}
+          style={{ padding: '6px 8px', flex: '2 1 220px', minWidth: 160, boxSizing: 'border-box' }}
         />
-        <button type="submit" style={{ padding: '6px 10px' }}>Cadastrar ponto</button>
-        <button type="button" onClick={clearPoints} style={{ padding: '6px 10px' }}>Limpar</button>
-        <button type="button" onClick={() => setShowList(true)} style={{ padding: '6px 10px', marginLeft: 8 }}>
+        <button type="submit" style={{ padding: '6px 10px', flex: '0 0 auto' }}>Cadastrar ponto</button>
+        <button type="button" onClick={clearPoints} style={{ padding: '6px 10px', flex: '0 0 auto' }}>Limpar</button>
+        <button type="button" onClick={() => setShowList(true)} style={{ padding: '6px 10px', marginLeft: 8, flex: '0 0 auto' }}>
           Meus pontos
         </button>
       </form>
 
-      <div ref={mapRef} className="map-root" role="img" aria-label="Mapa com localização e pontos" />
+      {/* Inputs ocultos: câmera (fallback) e upload */}
+      <input
+        ref={cameraInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        onChange={onCameraChange}
+        style={{ display: 'none' }}
+      />
+      <input
+        ref={uploadInputRef}
+        type="file"
+        accept="image/*"
+        onChange={onUploadChange}
+        style={{ display: 'none' }}
+      />
+
+      <div
+        ref={mapRef}
+        className="map-root"
+        role="img"
+        aria-label="Mapa com localização e pontos"
+        style={{ flex: 1, minHeight: 320, width: '100%' }}
+      />
+
+      {/* Componente de câmera */}
+      <Camera
+        open={cameraOpen}
+        onClose={handleCameraClose}
+        onCapture={handleCameraCapture}
+        facingMode="environment"
+      />
+
+      {/* Modal de captura/descrição */}
+      {captureOpen && (
+        <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) cancelCapture() }}>
+          <div
+            className="modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Novo ponto por foto"
+            style={{ width: 'min(640px, 96vw)' }}
+          >
+            <div className="modal__header">
+              <strong>Novo ponto</strong>
+              <button className="modal__btn" onClick={cancelCapture}>Cancelar</button>
+            </div>
+
+            <div style={{ display: 'grid', gap: 8 }}>
+              <div>
+                <small style={{ color: '#64748b' }}>Coordenadas selecionadas</small><br />
+                <span>{pendingCoord ? `${pendingCoord.lat.toFixed(6)}, ${pendingCoord.lng.toFixed(6)}` : '—'}</span>
+                {photoExifCoord && (
+                  <div style={{ marginTop: 6, fontSize: 12, color: '#64748b' }}>
+                    EXIF: {photoExifCoord.lat.toFixed(6)}, {photoExifCoord.lng.toFixed(6)} (já aplicado se confirmado)
+                  </div>
+                )}
+              </div>
+
+              {photoDataUrl && (
+                <img src={photoDataUrl} alt="Pré-visualização da foto" style={{ width: '100%', borderRadius: 8, border: '1px solid #e5e7eb' }} />
+              )}
+
+              <label style={{ display: 'grid', gap: 6 }}>
+                <span>Título (opcional)</span>
+                <input
+                  type="text"
+                  value={titleDraft}
+                  onChange={(e) => setTitleDraft(e.target.value)}
+                  placeholder="Ex.: Ipê amarelo na praça"
+                  style={{ padding: 8, borderRadius: 8, border: '1px solid #e5e7eb' }}
+                />
+              </label>
+
+              <label style={{ display: 'grid', gap: 6 }}>
+                <span>Descrição</span>
+                <textarea
+                  rows={4}
+                  value={descDraft}
+                  onChange={(e) => setDescDraft(e.target.value)}
+                  placeholder="Escreva uma descrição da flor/local..."
+                  style={{ padding: 8, borderRadius: 8, border: '1px solid #e5e7eb' }}
+                />
+              </label>
+
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                <button className="modal__btn" onClick={cancelCapture}>Cancelar</button>
+                <button className="modal__btn modal__btn--ok" onClick={saveCapturedPoint}>Salvar ponto</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Painel de condições ambientais (flutuante) */}
-      <div className="mapa-painel">
-        
+      <div
+        style={{
+          position: 'absolute', right: 12, bottom: 12, zIndex: 1000,
+          background: 'rgba(255,255,255,0.9)', backdropFilter: 'blur(6px)',
+          border: '1px solid #e5e7eb', borderRadius: 12, padding: 10, minWidth: 260,
+          boxShadow: '0 6px 16px rgba(0,0,0,.08)'
+        }}
+      >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
           <strong>Condições ambientais</strong>
           <button
@@ -508,43 +873,183 @@ export default function MapPage() {
           </button>
         </div>
 
-        <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
-          Centro: {centerRef.current.lat.toFixed(4)}, {centerRef.current.lng.toFixed(4)}
-        </div>
+        {/* NOVO: conteúdo colapsável */}
+        {!envCollapsed && (
+          <div id="env-panel-content">
+            <div style={{ fontSize: 12, color: '#64748b', marginTop: 6 }}>
+              Centro: {centerRef.current.lat.toFixed(4)}, {centerRef.current.lng.toFixed(4)}
+            </div>
 
-        <div style={{ marginTop: 8, display: 'grid', gap: 6 }}>
-          <div>
-            <span style={{ color: '#64748b' }}>Vento: </span>
-            <span>
-              {envInfo?.windSpeed != null ? `${envInfo.windSpeed} km/h` : '—'} • {envInfo?.windDir != null ? `${degToCompass(envInfo.windDir)} (${Math.round(envInfo.windDir)}°)` : '—'}
-            </span>
+            <div style={{ marginTop: 10, display: 'grid', gap: 8 }}>
+              {/* Vento */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <span style={{ color: '#64748b', minWidth: 64, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <span aria-hidden="true">🌬️</span> Vento
+                </span>
+                <span
+                  style={{
+                    background: '#ecfeff',
+                    border: '1px solid #bae6fd',
+                    color: '#075985',
+                    padding: '4px 8px',
+                    borderRadius: 999,
+                    fontSize: 12
+                  }}
+                >
+                  {envInfo?.windSpeed != null ? `${envInfo.windSpeed} km/h` : '—'}
+                </span>
+                <span
+                  style={{
+                    background: '#f1f5f9',
+                    border: '1px solid #e2e8f0',
+                    color: '#334155',
+                    padding: '4px 8px',
+                    borderRadius: 999,
+                    fontSize: 12
+                  }}
+                >
+                  {envInfo?.windDir != null ? `${degToCompass(envInfo.windDir)} (${Math.round(envInfo.windDir)}°)` : '—'}
+                </span>
+              </div>
+
+              {/* Umidade */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <span style={{ color: '#64748b', minWidth: 64, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <span aria-hidden="true">💧</span> Umidade
+                </span>
+                <span
+                  style={{
+                    background: '#eef2ff',
+                    border: '1px solid #c7d2fe',
+                    color: '#3730a3',
+                    padding: '4px 8px',
+                    borderRadius: 999,
+                    fontSize: 12
+                  }}
+                >
+                  {envInfo?.humidity != null ? `${envInfo.humidity}%` : '—'}
+                </span>
+              </div>
+
+              {/* Qualidade do ar */}
+              <div style={{ display: 'grid', gap: 6 }}>
+                <span style={{ color: '#64748b', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <span aria-hidden="true">🫧</span> Qualidade do ar
+                </span>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  <span
+                    style={{
+                      background: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      color: '#0f172a',
+                      padding: '4px 8px',
+                      borderRadius: 999,
+                      fontSize: 12
+                    }}
+                  >
+                    PM2.5 {envInfo?.pm25 != null ? `${envInfo.pm25} µg/m³` : '—'}
+                  </span>
+                  <span
+                    style={{
+                      background: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      color: '#0f172a',
+                      padding: '4px 8px',
+                      borderRadius: 999,
+                      fontSize: 12
+                    }}
+                  >
+                    PM10 {envInfo?.pm10 != null ? `${envInfo.pm10} µg/m³` : '—'}
+                  </span>
+                  <span
+                    style={{
+                      background: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      color: '#0f172a',
+                      padding: '4px 8px',
+                      borderRadius: 999,
+                      fontSize: 12
+                    }}
+                  >
+                    O₃ {envInfo?.o3 != null ? `${envInfo.o3} µg/m³` : '—'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Pólen */}
+              <div style={{ display: 'grid', gap: 6 }}>
+                <span style={{ color: '#64748b', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <span aria-hidden="true">🌿</span> Pólen
+                </span>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  <span
+                    style={{
+                      background: '#ecfccb',
+                      border: '1px solid #d9f99d',
+                      color: '#365314',
+                      padding: '4px 8px',
+                      borderRadius: 999,
+                      fontSize: 12
+                    }}
+                  >
+                    Grama {envInfo?.pollen?.grass ?? '—'}
+                  </span>
+                  <span
+                    style={{
+                      background: '#f0fdf4',
+                      border: '1px solid #bbf7d0',
+                      color: '#14532d',
+                      padding: '4px 8px',
+                      borderRadius: 999,
+                      fontSize: 12
+                    }}
+                  >
+                    Árvores {envInfo?.pollen?.tree ?? '—'}
+                  </span>
+                  <span
+                    style={{
+                      background: '#fff7ed',
+                      border: '1px solid #fed7aa',
+                      color: '#7c2d12',
+                      padding: '4px 8px',
+                      borderRadius: 999,
+                      fontSize: 12
+                    }}
+                  >
+                    Ervas {envInfo?.pollen?.weed ?? '—'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Atualizado em */}
+              <div style={{ fontSize: 11, color: '#94a3b8', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span
+                  aria-hidden="true"
+                  style={{
+                    width: 6,
+                    height: 6,
+                    borderRadius: 999,
+                    background: envInfo?.at ? '#22c55e' : '#cbd5e1',
+                    display: 'inline-block'
+                  }}
+                />
+                {envInfo?.at ? `Atualizado: ${new Date(envInfo.at).toLocaleString()}` : 'Aguardando dados…'}
+              </div>
+            </div>
           </div>
-          <div>
-            <span style={{ color: '#64748b' }}>Umidade: </span>
-            <span>{envInfo?.humidity != null ? `${envInfo.humidity}%` : '—'}</span>
-          </div>
-          <div>
-            <span style={{ color: '#64748b' }}>Qualidade do ar: </span>
-            <span>PM2.5 {envInfo?.pm25 != null ? `${envInfo.pm25} µg/m³` : '—'}, PM10 {envInfo?.pm10 != null ? `${envInfo.pm10} µg/m³` : '—'}, O₃ {envInfo?.o3 != null ? `${envInfo.o3} µg/m³` : '—'}</span>
-          </div>
-          <div>
-            <span style={{ color: '#64748b' }}>Pólen: </span>
-            <span>
-              {envInfo?.pollen
-                ? `Grama ${envInfo.pollen.grass ?? '—'} • Árvores ${envInfo.pollen.tree ?? '—'} • Ervas ${envInfo.pollen.weed ?? '—'}`
-                : '—'}
-            </span>
-          </div>
-          <div style={{ fontSize: 11, color: '#94a3b8' }}>
-            {envInfo?.at ? `Atualizado: ${new Date(envInfo.at).toLocaleString()}` : ''}
-          </div>
-        </div>
+        )}
       </div>
 
       {/* NOVO: Popup com a lista de pontos */}
       {showList && (
         <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setShowList(false) }}>
-          <div className="modal" role="dialog" aria-modal="true" aria-label="Pontos cadastrados">
+          <div
+            className="modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Pontos cadastrados"
+            style={{ width: 'min(640px, 96vw)' }}
+          >
             <div className="modal__header">
               <strong>Pontos cadastrados</strong>
               <button className="modal__btn" onClick={() => setShowList(false)}>Fechar</button>

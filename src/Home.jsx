@@ -1,0 +1,50 @@
+import reactLogo from './assets/react.svg'
+import viteLogo from '/vite.svg'
+import './Home.css'
+import {Link} from "react-router-dom";
+
+
+function Home() {
+
+  return (
+    <>
+        <div className="petals-container">
+            {[...Array(20)].map((_, i) => (
+                <div
+                    key={i}
+                    className="petal"
+                    style={{
+                        left: `${Math.random() * 100}vw`,
+                        animationDuration: `${4 + Math.random() * 6}s`,
+                        animationDelay: `${Math.random() * 5}s`
+                    }}
+                />
+            ))}
+        </div>
+      <div className="glass-card">
+          <div>
+              <a href="https://vite.dev" target="_blank">
+                  <img src={viteLogo} className="logo" alt="Vite logo" />
+              </a>
+              <a href="https://react.dev" target="_blank">
+                  <img src={reactLogo} className="logo react" alt="React logo" />
+              </a>
+          </div>
+          <h1>BloomStack</h1>
+          <div className="card">
+              <Link to="/maps">
+                  <button>Ir para Maps</button>
+              </Link>
+              <p>
+                  Edit <code>src/Home.jsx</code> and save to test HMR
+              </p>
+          </div>
+          <p className="read-the-docs">
+              Click on the Vite and React logos to learn more
+          </p>
+      </div>
+    </>
+  )
+}
+
+export default Home;
