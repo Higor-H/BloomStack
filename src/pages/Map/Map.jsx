@@ -131,14 +131,20 @@ function buildBaseLayer(kind, date) {
   return kind === 'gibs' ? buildGibsLayer(date) : buildOsmLayer()
 }
 
-// NOVO: overlay de limites (países, estados e cidades) – transparente
-function buildBoundariesOverlay() {
-  return L.tileLayer(
-    'https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
-    {
-      attribution: 'Esri, HERE, Garmin, © OpenStreetMap contributors, and the GIS user community'
-    }
-  )
+// NOVO: overlays NASA GIBS voltados a blooms (Chlorophyll-a)
+function buildNasaOverlay(kind, date = getGibsDate()) {
+  if (!kind || kind === 'none') return null
+  const base = 'https://gibs.earthdata.nasa.gov/wmts/epsg3857/best'
+  const byKind = {
+    viirs_chla: `${base}/VIIRS_SNPP_Chlorophyll_A/default/${date}/GoogleMapsCompatible_Level9/{z}/{y}/{x}.png`,
+    modis_chla: `${base}/MODIS_Aqua_Chlorophyll_A/default/${date}/GoogleMapsCompatible_Level9/{z}/{y}/{x}.png`,
+  }
+  const url = byKind[kind]
+  if (!url) return null
+  return L.tileLayer(url, {
+    tileSize: 256, minZoom: 1, maxZoom: 9,
+    attribution: 'Imagery © NASA GIBS/ESDIS'
+  })
 }
 
 // Conversão graus -> ponto cardeal simples
@@ -153,7 +159,8 @@ export default function MapPage() {
   const mapInst = useRef(null)
   const userLayer = useRef(null)
   const baseLayerRef = useRef(null)
-  const boundariesLayerRef = useRef(null) // NOVO: ref da camada de limites
+  const boundariesLayerRef = useRef(null)
+  const nasaOverlayRef = useRef(null) // NOVO: overlay NASA prioritário
   const centerRef = useRef({ lat: 0, lng: 0 })
 
   const [lat, setLat] = useState('')
@@ -167,6 +174,8 @@ export default function MapPage() {
   const [showBoundaries, setShowBoundaries] = useState(true) // NOVO: controle de exibição
   const [envInfo, setEnvInfo] = useState(null)
   const [loadingEnv, setLoadingEnv] = useState(false)
+  // NOVO: camada NASA (blooms)
+  const [nasaLayer, setNasaLayer] = useState('viirs_chla') // 'none' | 'viirs_chla' | 'modis_chla'
 
   // NOVO: refs e estados para captura de foto
   const cameraInputRef = useRef(null)
@@ -186,6 +195,10 @@ export default function MapPage() {
   // NOVO: minimizar/expandir painel ambiental
   const [envCollapsed, setEnvCollapsed] = useState(false)
   const ENV_COLLAPSED_KEY = 'bloomstack.ui/envPanelCollapsed'
+
+  // NOVO: estados para vegetação (OSM/Overpass)
+  const [loadingVeg, setLoadingVeg] = useState(false)
+  const [vegInfo, setVegInfo] = useState(null)
 
   useEffect(() => {
     const onResize = () => setIsNarrow(window.innerWidth < 768) // < 768px = mobile/tablet pequeno
@@ -332,7 +345,7 @@ export default function MapPage() {
     btnCam.style.padding = '4px 8px'
     btnCam.style.border = '1px solid #e5e7eb'
     btnCam.style.borderRadius = '6px'
-    btnCam.style.background = '#ecfccb'
+    btnCam.style.background = '#aaff00ff'
     btnCam.onclick = () => {
       mapInst.current?.closePopup()
       // passa a coord explícita para evitar depender do estado
@@ -525,16 +538,22 @@ export default function MapPage() {
     const map = L.map(mapRef.current).setView([0, 0], 2)
     mapInst.current = map
 
-    // Camada base inicial conforme seleção e data
+    // Camada base inicial
     baseLayerRef.current = buildBaseLayer(basemap, gibsDate)
     baseLayerRef.current.addTo(map)
 
     userLayer.current = L.layerGroup().addTo(map)
 
-    // NOVO: adiciona overlay de limites se habilitado
+    // Overlay de limites (opcional)
     if (showBoundaries) {
       boundariesLayerRef.current = buildBoundariesOverlay()
       boundariesLayerRef.current.addTo(map)
+    }
+
+    // NOVO: overlay NASA de blooms (prioridade)
+    if (nasaLayer && nasaLayer !== 'none') {
+      nasaOverlayRef.current = buildNasaOverlay(nasaLayer, gibsDate)
+      nasaOverlayRef.current && nasaOverlayRef.current.addTo(map)
     }
 
     // Guardar centro do mapa
@@ -597,18 +616,30 @@ export default function MapPage() {
     baseLayerRef.current.addTo(mapInst.current)
   }, [basemap, gibsDate])
 
-  // NOVO: alternar a camada de limites dinamicamente
+  // NOVO: atualizar overlay NASA quando camada/data mudarem
   useEffect(() => {
     if (!mapInst.current) return
-    if (showBoundaries) {
-      if (!boundariesLayerRef.current) {
-        boundariesLayerRef.current = buildBoundariesOverlay()
-      }
-      boundariesLayerRef.current.addTo(mapInst.current)
-    } else if (boundariesLayerRef.current) {
-      try { mapInst.current.removeLayer(boundariesLayerRef.current) } catch {}
+    // remove anterior
+    if (nasaOverlayRef.current) {
+      try { mapInst.current.removeLayer(nasaOverlayRef.current) } catch {}
+      nasaOverlayRef.current = null
     }
-  }, [showBoundaries])
+    // adiciona novo se houver seleção
+    if (nasaLayer && nasaLayer !== 'none') {
+      nasaOverlayRef.current = buildNasaOverlay(nasaLayer, gibsDate)
+      nasaOverlayRef.current && nasaOverlayRef.current.addTo(mapInst.current)
+    }
+  }, [nasaLayer, gibsDate])
+
+  // NOVO: overlay de limites (países, estados e cidades) – transparente
+  function buildBoundariesOverlay() {
+    return L.tileLayer(
+      'https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
+      {
+        attribution: 'Esri, HERE, Garmin, © OpenStreetMap contributors, and the GIS user community'
+      }
+    )
+  }
 
   // Adiciona ponto e salva, depois redesenha (popups já terão o botão)
   function addPoint(latNum, lngNum, lbl, opts = { save: true, pan: true }) {
@@ -701,6 +732,72 @@ export default function MapPage() {
     refreshPoints({ pan: false })
   }
 
+  // NOVO: consulta vegetação próxima via Overpass (OSM)
+  async function fetchVegetationInfo(lat, lng, radius = 500) {
+    try {
+      setLoadingVeg(true)
+      setVegInfo(null)
+      // Seleciona usos do solo/natural/lazer que indicam vegetação
+      const q = `
+[out:json][timeout:25];
+(
+  nwr(around:${radius},${lat},${lng})[landuse~"^(forest|meadow|grass|orchard|vineyard|allotments|farmland)$"];
+  nwr(around:${radius},${lat},${lng})[natural~"^(wood|scrub|heath|grassland)$"];
+  nwr(around:${radius},${lat},${lng})[leisure~"^(park|garden|nature_reserve)$"];
+);
+out tags center 100;`
+      const res = await fetch('https://overpass-api.de/api/interpreter', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+        body: 'data=' + encodeURIComponent(q)
+      })
+      const json = await res.json()
+      const els = Array.isArray(json?.elements) ? json.elements : []
+
+      const categories = {}
+      const names = new Set()
+
+      const pushCat = (k) => { categories[k] = (categories[k] || 0) + 1 }
+      const friendly = (tags = {}) => {
+        if (tags.landuse === 'forest') return 'Floresta'
+        if (tags.natural === 'wood') return 'Mata'
+        if (tags.natural === 'scrub') return 'Arbustos'
+        if (tags.natural === 'heath') return 'Charneca'
+        if (tags.natural === 'grassland') return 'Campos'
+        if (tags.landuse === 'meadow' || tags.landuse === 'grass') return 'Prado/Grama'
+        if (tags.leisure === 'park') return 'Parque'
+        if (tags.leisure === 'garden') return 'Jardim'
+        if (tags.leisure === 'nature_reserve') return 'Reserva'
+        if (tags.landuse === 'orchard') return 'Pomar'
+        if (tags.landuse === 'vineyard') return 'Vinhedo'
+        if (tags.landuse === 'allotments') return 'Hortas'
+        if (tags.landuse === 'farmland') return 'Agrícola'
+        return null
+      }
+
+      els.forEach(e => {
+        const k = friendly(e.tags || {})
+        if (k) pushCat(k)
+        const nm = (e.tags?.name || e.tags?.['name:pt'] || e.tags?.['name:en'])?.trim()
+        if (nm) names.add(nm)
+      })
+
+      setVegInfo({
+        lat: Number(lat), lng: Number(lng),
+        radius,
+        total: els.length,
+        categories,
+        names: Array.from(names).slice(0, 8),
+        at: new Date().toISOString()
+      })
+    } catch (e) {
+      console.warn('Falha ao obter vegetação (Overpass)', e)
+      setVegInfo(null)
+    } finally {
+      setLoadingVeg(false)
+    }
+  }
+
   return (
     <div className="map-page" style={{ display: 'flex', flexDirection: 'column', height: '100dvh' }}>
       <form
@@ -717,7 +814,7 @@ export default function MapPage() {
           </select>
         </label>
 
-        {/* Seletor de data para o GIBS (default: ontem) */}
+        {/* Seletor de data (habilitado se basemap GIBS ou overlay NASA ativo) */}
         <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <span style={{ fontSize: 14, color: '#64748b' }}>Data</span>
           <input
@@ -726,15 +823,23 @@ export default function MapPage() {
             min={GIBS_MIN_DATE}
             max={getGibsDate()}
             onChange={(e) => setGibsDate(clampGibsDate(e.target.value))}
-            disabled={basemap !== 'gibs'}
+            disabled={basemap !== 'gibs' && nasaLayer === 'none'}
             style={{ padding: '6px 8px' }}
           />
         </label>
 
-        {/* NOVO: switch para limites */}
+        {/* NOVO: overlay NASA prioridade (blooms) */}
         <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ fontSize: 14, color: '#64748b' }}>Limites</span>
-          <input type="checkbox" checked={showBoundaries} onChange={(e) => setShowBoundaries(e.target.checked)} />
+          <span style={{ fontSize: 14, color: '#64748b' }}>NASA (blooms)</span>
+          <select
+            value={nasaLayer}
+            onChange={(e) => setNasaLayer(e.target.value)}
+            style={{ padding: '6px 8px' }}
+          >
+            <option value="viirs_chla">VIIRS SNPP Chlorophyll-a</option>
+            <option value="modis_chla">MODIS Aqua Chlorophyll-a</option>
+            <option value="none">Sem overlay</option>
+          </select>
         </label>
 
         <input
@@ -919,10 +1024,28 @@ export default function MapPage() {
             >
               {loadingEnv ? 'Atualizando…' : 'Atualizar (centro)'}
             </button>
+
+            {/* NOVO: Vegetação (500 m) */}
+            <button
+              onClick={() => fetchVegetationInfo(centerRef.current.lat, centerRef.current.lng, 500)}
+              disabled={loadingVeg}
+              style={{
+                padding: '6px 10px',
+                border: '1px solid #cbd5e1',
+                borderRadius: 10,
+                background: loadingVeg ? '#e2e8f0' : '#f8fafc',
+                color: '#0f172a',
+                fontSize: 12,
+                cursor: loadingVeg ? 'default' : 'pointer'
+              }}
+              title="Buscar tipos de vegetação num raio de 500 m (OSM)"
+            >
+              {loadingVeg ? 'Buscando…' : 'Vegetação (500 m)'}
+            </button>
           </div>
         </div>
 
-        {/* NOVO: conteúdo colapsável */}
+        {/* NOVO: conteúdo colapsável (mantido) */}
         {!envCollapsed && (
           <div id="env-panel-content">
             <div style={{ fontSize: 12, color: '#64748b', marginTop: 6 }}>
@@ -1068,6 +1191,53 @@ export default function MapPage() {
                     Ervas {envInfo?.pollen?.weed ?? '—'}
                   </span>
                 </div>
+              </div>
+
+              {/* NOVO: Vegetação próxima (OSM) */}
+              <div style={{ display: 'grid', gap: 6 }}>
+                <span style={{ color: '#64748b', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <span aria-hidden="true">🌳</span> Vegetação próxima (OSM)
+                </span>
+
+                {vegInfo ? (
+                  <div style={{ display: 'grid', gap: 6 }}>
+                    <div style={{ fontSize: 12, color: '#64748b' }}>
+                      Raio: ~{Math.round(vegInfo.radius)} m • Itens: {vegInfo.total}
+                    </div>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      {Object.keys(vegInfo.categories).length === 0 && (
+                        <span style={{ color: '#94a3b8' }}>Nenhuma classe encontrada.</span>
+                      )}
+                      {Object.entries(vegInfo.categories).map(([k, v]) => (
+                        <span
+                          key={k}
+                          style={{
+                            background: '#f0fdf4',
+                            border: '1px solid #bbf7d0',
+                            color: '#14532d',
+                            padding: '4px 8px',
+                            borderRadius: 999,
+                            fontSize: 12
+                          }}
+                        >
+                          {k}: {v}
+                        </span>
+                      ))}
+                    </div>
+                    {!!vegInfo.names?.length && (
+                      <div style={{ fontSize: 12, color: '#64748b' }}>
+                        Próximos: {vegInfo.names.join(' · ')}
+                      </div>
+                    )}
+                    <div style={{ fontSize: 11, color: '#94a3b8' }}>
+                      Fonte: OpenStreetMap (Overpass) • {new Date(vegInfo.at).toLocaleString()}
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ fontSize: 12, color: '#94a3b8' }}>
+                    {loadingVeg ? 'Carregando vegetação…' : 'Clique em “Vegetação (500 m)” para buscar.'}
+                  </div>
+                )}
               </div>
 
               {/* Atualizado em */}
