@@ -181,6 +181,28 @@ export default function MapPage() {
 
   // NOVO: controle do componente de câmera
   const [cameraOpen, setCameraOpen] = useState(false)
+  // NOVO: flag de largura da tela para responsividade
+  const [isNarrow, setIsNarrow] = useState(false)
+  // NOVO: minimizar/expandir painel ambiental
+  const [envCollapsed, setEnvCollapsed] = useState(false)
+  const ENV_COLLAPSED_KEY = 'bloomstack.ui/envPanelCollapsed'
+
+  useEffect(() => {
+    const onResize = () => setIsNarrow(window.innerWidth < 768) // < 768px = mobile/tablet pequeno
+    onResize()
+    window.addEventListener('resize', onResize)
+    // NOVO: carrega preferencia do painel
+    try {
+      const saved = localStorage.getItem(ENV_COLLAPSED_KEY)
+      if (saved != null) setEnvCollapsed(saved === '1')
+    } catch {}
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+
+  useEffect(() => {
+    // NOVO: persiste preferencia do painel
+    try { localStorage.setItem(ENV_COLLAPSED_KEY, envCollapsed ? '1' : '0') } catch {}
+  }, [envCollapsed])
 
   // Util: ler arquivo, reduzir e retornar dataURL
   async function fileToDataUrlResized(file, maxW = 1280, maxH = 1280) {
@@ -354,12 +376,6 @@ export default function MapPage() {
     mapInst.current.on('click', onMapClick)
     return () => { mapInst.current && mapInst.current.off('click', onMapClick) }
   }, [mapInst.current])
-
-  // Tornar o botão "Novo ponto (foto)" apenas um auxílio: instrução para clicar no mapa
-  function startCaptureFlow() {
-    alert('Clique no mapa para escolher a coordenada e selecione “Bater foto” ou “Fazer upload”.')
-    // sem flags; o clique no mapa já abre o popup
-  }
 
   function cancelCapture() {
     setCaptureOpen(false)
@@ -640,6 +656,19 @@ export default function MapPage() {
     const doc = points.find(p => p.id === id)
     if (!doc || !mapInst.current) return
     mapInst.current.setView([doc.lat, doc.lng], 15)
+
+    // Abre popup com nome do ponto (e coords/link)
+    const html = `
+      <div style="min-width:180px">
+        <div style="font-weight:600;margin-bottom:4px">${escapeHtml(doc.label?.trim() || '(sem rótulo)')}</div>
+        <div style="font-size:12px;color:#64748b;margin-bottom:6px">${doc.lat.toFixed(5)}, ${doc.lng.toFixed(5)}</div>
+        <a href="/${encodeURIComponent(doc.slug)}"
+           style="display:inline-block;padding:4px 8px;border:1px solid #e5e7eb;border-radius:6px;background:#f8fafc;text-decoration:none;color:#111827">
+           Ver detalhes
+        </a>
+      </div>
+    `
+    L.popup().setLatLng([doc.lat, doc.lng]).setContent(html).openOn(mapInst.current)
   }
 
   // NOVO: editar ponto
@@ -673,8 +702,12 @@ export default function MapPage() {
   }
 
   return (
-    <div className="map-page">
-      <form onSubmit={onSubmit} className="map-form" style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+    <div className="map-page" style={{ display: 'flex', flexDirection: 'column', height: '100dvh' }}>
+      <form
+        onSubmit={onSubmit}
+        className="map-form"
+        style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', marginBottom: 8 }}
+      >
         {/* Alternador de mapa base */}
         <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <span style={{ fontSize: 14, color: '#cfdbedff' }}>Visão</span>
@@ -707,26 +740,22 @@ export default function MapPage() {
         <input
           type="text" inputMode="decimal" placeholder="Lat (-90 a 90)"
           value={lat} onChange={(e) => setLat(e.target.value)}
-          style={{ padding: '6px 8px' }}
+          style={{ padding: '6px 8px', flex: '1 1 150px', minWidth: 120, boxSizing: 'border-box' }}
         />
         <input
           type="text" inputMode="decimal" placeholder="Lng (-180 a 180)"
           value={lng} onChange={(e) => setLng(e.target.value)}
-          style={{ padding: '6px 8px' }}
+          style={{ padding: '6px 8px', flex: '1 1 150px', minWidth: 120, boxSizing: 'border-box' }}
         />
         <input
           type="text" placeholder="Rótulo (opcional)"
           value={label} onChange={(e) => setLabel(e.target.value)}
-          style={{ padding: '6px 8px' }}
+          style={{ padding: '6px 8px', flex: '2 1 220px', minWidth: 160, boxSizing: 'border-box' }}
         />
-        <button type="submit" style={{ padding: '6px 10px' }}>Cadastrar ponto</button>
-        <button type="button" onClick={clearPoints} style={{ padding: '6px 10px' }}>Limpar</button>
-        <button type="button" onClick={() => setShowList(true)} style={{ padding: '6px 10px', marginLeft: 8 }}>
+        <button type="submit" style={{ padding: '6px 10px', flex: '0 0 auto' }}>Cadastrar ponto</button>
+        <button type="button" onClick={clearPoints} style={{ padding: '6px 10px', flex: '0 0 auto' }}>Limpar</button>
+        <button type="button" onClick={() => setShowList(true)} style={{ padding: '6px 10px', marginLeft: 8, flex: '0 0 auto' }}>
           Meus pontos
-        </button>
-        {/* Botão para novo fluxo por foto */}
-        <button type="button" onClick={startCaptureFlow} style={{ padding: '6px 10px', background: '#ecfccb', border: '1px solid #e5e7eb', borderRadius: 8 }}>
-          Novo ponto (foto)
         </button>
       </form>
 
@@ -747,7 +776,13 @@ export default function MapPage() {
         style={{ display: 'none' }}
       />
 
-      <div ref={mapRef} className="map-root" role="img" aria-label="Mapa com localização e pontos" />
+      <div
+        ref={mapRef}
+        className="map-root"
+        role="img"
+        aria-label="Mapa com localização e pontos"
+        style={{ flex: 1, minHeight: 320, width: '100%' }}
+      />
 
       {/* Componente de câmera */}
       <Camera
@@ -760,7 +795,13 @@ export default function MapPage() {
       {/* Modal de captura/descrição */}
       {captureOpen && (
         <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) cancelCapture() }}>
-          <div className="modal" role="dialog" aria-modal="true" aria-label="Novo ponto por foto">
+          <div
+            className="modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Novo ponto por foto"
+            style={{ width: 'min(640px, 96vw)' }}
+          >
             <div className="modal__header">
               <strong>Novo ponto</strong>
               <button className="modal__btn" onClick={cancelCapture}>Cancelar</button>
@@ -815,60 +856,245 @@ export default function MapPage() {
       {/* Painel de condições ambientais (flutuante) */}
       <div
         style={{
-          position: 'absolute', right: 12, bottom: 12, zIndex: 1000,
-          background: 'rgba(255,255,255,0.9)', backdropFilter: 'blur(6px)',
-          border: '1px solid #e5e7eb', borderRadius: 12, padding: 10, minWidth: 260,
-          boxShadow: '0 6px 16px rgba(0,0,0,.08)'
+          position: isNarrow ? 'fixed' : 'absolute',
+          right: isNarrow ? 8 : 16,
+          left: isNarrow ? 8 : 'auto',
+          bottom: isNarrow ? 8 : 16,
+          zIndex: 1000,
+          color: '#0f172a',
+          background: 'linear-gradient(180deg, rgba(255,255,255,0.98), rgba(255,255,255,0.92))',
+          backdropFilter: 'blur(8px)',
+          border: '1px solid #e2e8f0',
+          borderRadius: 14,
+          padding: envCollapsed ? 8 : 12, // NOVO
+          minWidth: isNarrow ? 'auto' : 280,
+          maxWidth: isNarrow ? 'calc(100vw - 16px)' : 360,
+          boxShadow: '0 10px 30px rgba(2,6,23,.12)'
         }}
       >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-          <strong>Condições ambientais</strong>
-          <button
-            onClick={() => fetchEnvInfo(centerRef.current.lat, centerRef.current.lng)}
-            disabled={loadingEnv}
-            style={{ padding: '4px 8px', border: '1px solid #e5e7eb', borderRadius: 8, background: '#f8fafc', cursor: 'pointer' }}
-          >
-            {loadingEnv ? 'Atualizando…' : 'Atualizar (centro)'}
-          </button>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span aria-hidden="true">🌤️</span>
+            <strong style={{ fontSize: 14 }}>Condições ambientais</strong>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            {/* NOVO: botão minimizar/expandir */}
+            <button
+              type="button"
+              onClick={() => setEnvCollapsed(v => !v)}
+              aria-expanded={!envCollapsed}
+              aria-controls="env-panel-content"
+              title={envCollapsed ? 'Expandir' : 'Minimizar'}
+              style={{
+                padding: '6px 10px',
+                border: '1px solid #cbd5e1',
+                borderRadius: 10,
+                background: '#ffffff',
+                color: '#0f172a',
+                fontSize: 12,
+                cursor: 'pointer'
+              }}
+            >
+              {envCollapsed ? 'Expandir' : 'Minimizar'}
+            </button>
+
+            <button
+              onClick={() => fetchEnvInfo(centerRef.current.lat, centerRef.current.lng)}
+              disabled={loadingEnv}
+              style={{
+                padding: '6px 10px',
+                border: '1px solid #cbd5e1',
+                borderRadius: 10,
+                background: loadingEnv ? '#e2e8f0' : '#f8fafc',
+                color: '#0f172a',
+                fontSize: 12,
+                cursor: loadingEnv ? 'default' : 'pointer'
+              }}
+              title="Atualizar pelas coordenadas do centro do mapa"
+            >
+              {loadingEnv ? 'Atualizando…' : 'Atualizar (centro)'}
+            </button>
+          </div>
         </div>
 
-        <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
-          Centro: {centerRef.current.lat.toFixed(4)}, {centerRef.current.lng.toFixed(4)}
-        </div>
+        {/* NOVO: conteúdo colapsável */}
+        {!envCollapsed && (
+          <div id="env-panel-content">
+            <div style={{ fontSize: 12, color: '#64748b', marginTop: 6 }}>
+              Centro: {centerRef.current.lat.toFixed(4)}, {centerRef.current.lng.toFixed(4)}
+            </div>
 
-        <div style={{ marginTop: 8, display: 'grid', gap: 6 }}>
-          <div>
-            <span style={{ color: '#64748b' }}>Vento: </span>
-            <span>
-              {envInfo?.windSpeed != null ? `${envInfo.windSpeed} km/h` : '—'} • {envInfo?.windDir != null ? `${degToCompass(envInfo.windDir)} (${Math.round(envInfo.windDir)}°)` : '—'}
-            </span>
+            <div style={{ marginTop: 10, display: 'grid', gap: 8 }}>
+              {/* Vento */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <span style={{ color: '#64748b', minWidth: 64, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <span aria-hidden="true">🌬️</span> Vento
+                </span>
+                <span
+                  style={{
+                    background: '#ecfeff',
+                    border: '1px solid #bae6fd',
+                    color: '#075985',
+                    padding: '4px 8px',
+                    borderRadius: 999,
+                    fontSize: 12
+                  }}
+                >
+                  {envInfo?.windSpeed != null ? `${envInfo.windSpeed} km/h` : '—'}
+                </span>
+                <span
+                  style={{
+                    background: '#f1f5f9',
+                    border: '1px solid #e2e8f0',
+                    color: '#334155',
+                    padding: '4px 8px',
+                    borderRadius: 999,
+                    fontSize: 12
+                  }}
+                >
+                  {envInfo?.windDir != null ? `${degToCompass(envInfo.windDir)} (${Math.round(envInfo.windDir)}°)` : '—'}
+                </span>
+              </div>
+
+              {/* Umidade */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <span style={{ color: '#64748b', minWidth: 64, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <span aria-hidden="true">💧</span> Umidade
+                </span>
+                <span
+                  style={{
+                    background: '#eef2ff',
+                    border: '1px solid #c7d2fe',
+                    color: '#3730a3',
+                    padding: '4px 8px',
+                    borderRadius: 999,
+                    fontSize: 12
+                  }}
+                >
+                  {envInfo?.humidity != null ? `${envInfo.humidity}%` : '—'}
+                </span>
+              </div>
+
+              {/* Qualidade do ar */}
+              <div style={{ display: 'grid', gap: 6 }}>
+                <span style={{ color: '#64748b', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <span aria-hidden="true">🫧</span> Qualidade do ar
+                </span>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  <span
+                    style={{
+                      background: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      color: '#0f172a',
+                      padding: '4px 8px',
+                      borderRadius: 999,
+                      fontSize: 12
+                    }}
+                  >
+                    PM2.5 {envInfo?.pm25 != null ? `${envInfo.pm25} µg/m³` : '—'}
+                  </span>
+                  <span
+                    style={{
+                      background: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      color: '#0f172a',
+                      padding: '4px 8px',
+                      borderRadius: 999,
+                      fontSize: 12
+                    }}
+                  >
+                    PM10 {envInfo?.pm10 != null ? `${envInfo.pm10} µg/m³` : '—'}
+                  </span>
+                  <span
+                    style={{
+                      background: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      color: '#0f172a',
+                      padding: '4px 8px',
+                      borderRadius: 999,
+                      fontSize: 12
+                    }}
+                  >
+                    O₃ {envInfo?.o3 != null ? `${envInfo.o3} µg/m³` : '—'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Pólen */}
+              <div style={{ display: 'grid', gap: 6 }}>
+                <span style={{ color: '#64748b', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <span aria-hidden="true">🌿</span> Pólen
+                </span>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  <span
+                    style={{
+                      background: '#ecfccb',
+                      border: '1px solid #d9f99d',
+                      color: '#365314',
+                      padding: '4px 8px',
+                      borderRadius: 999,
+                      fontSize: 12
+                    }}
+                  >
+                    Grama {envInfo?.pollen?.grass ?? '—'}
+                  </span>
+                  <span
+                    style={{
+                      background: '#f0fdf4',
+                      border: '1px solid #bbf7d0',
+                      color: '#14532d',
+                      padding: '4px 8px',
+                      borderRadius: 999,
+                      fontSize: 12
+                    }}
+                  >
+                    Árvores {envInfo?.pollen?.tree ?? '—'}
+                  </span>
+                  <span
+                    style={{
+                      background: '#fff7ed',
+                      border: '1px solid #fed7aa',
+                      color: '#7c2d12',
+                      padding: '4px 8px',
+                      borderRadius: 999,
+                      fontSize: 12
+                    }}
+                  >
+                    Ervas {envInfo?.pollen?.weed ?? '—'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Atualizado em */}
+              <div style={{ fontSize: 11, color: '#94a3b8', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span
+                  aria-hidden="true"
+                  style={{
+                    width: 6,
+                    height: 6,
+                    borderRadius: 999,
+                    background: envInfo?.at ? '#22c55e' : '#cbd5e1',
+                    display: 'inline-block'
+                  }}
+                />
+                {envInfo?.at ? `Atualizado: ${new Date(envInfo.at).toLocaleString()}` : 'Aguardando dados…'}
+              </div>
+            </div>
           </div>
-          <div>
-            <span style={{ color: '#64748b' }}>Umidade: </span>
-            <span>{envInfo?.humidity != null ? `${envInfo.humidity}%` : '—'}</span>
-          </div>
-          <div>
-            <span style={{ color: '#64748b' }}>Qualidade do ar: </span>
-            <span>PM2.5 {envInfo?.pm25 != null ? `${envInfo.pm25} µg/m³` : '—'}, PM10 {envInfo?.pm10 != null ? `${envInfo.pm10} µg/m³` : '—'}, O₃ {envInfo?.o3 != null ? `${envInfo.o3} µg/m³` : '—'}</span>
-          </div>
-          <div>
-            <span style={{ color: '#64748b' }}>Pólen: </span>
-            <span>
-              {envInfo?.pollen
-                ? `Grama ${envInfo.pollen.grass ?? '—'} • Árvores ${envInfo.pollen.tree ?? '—'} • Ervas ${envInfo.pollen.weed ?? '—'}`
-                : '—'}
-            </span>
-          </div>
-          <div style={{ fontSize: 11, color: '#94a3b8' }}>
-            {envInfo?.at ? `Atualizado: ${new Date(envInfo.at).toLocaleString()}` : ''}
-          </div>
-        </div>
+        )}
       </div>
 
       {/* NOVO: Popup com a lista de pontos */}
       {showList && (
         <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setShowList(false) }}>
-          <div className="modal" role="dialog" aria-modal="true" aria-label="Pontos cadastrados">
+          <div
+            className="modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Pontos cadastrados"
+            style={{ width: 'min(640px, 96vw)' }}
+          >
             <div className="modal__header">
               <strong>Pontos cadastrados</strong>
               <button className="modal__btn" onClick={() => setShowList(false)}>Fechar</button>
