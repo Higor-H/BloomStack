@@ -43,6 +43,9 @@ function Home() {
               <Link to="/feed" style={{ marginLeft: 8 }}>
                   <button>Ver feed</button>
               </Link>
+              <Link to="/charts" style={{ marginLeft: 8, marginTop: 8 }}>
+                  <button>Ver gráficos</button>
+              </Link>
           </div>
           <p className="read-the-docs">
               By Ana Silva, Eduardo Zorzan, Gabriela Superti, Higor Milani, Lauro Ferneda, Maria Chehade
