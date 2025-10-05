@@ -37,6 +37,23 @@ import {
 } from '../../api/envApi.js'
 import { Link } from 'react-router-dom'
 
+// Helper: formatação de data US <-> ISO
+function pad2(n) { return String(n).padStart(2, '0') }
+function isoToUS(iso) {
+  if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return ''
+  const [y, m, d] = iso.split('-')
+  return `${m}/${d}/${y}`
+}
+function usToISO(us) {
+  const m = String(us || '').match(/^\s*(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})\s*$/)
+  if (!m) return null
+  const mm = pad2(+m[1]); const dd = pad2(+m[2]); const yyyy = m[3]
+  // validação simples
+  const dt = new Date(`${yyyy}-${mm}-${dd}T00:00:00`)
+  if (Number.isNaN(dt.getTime())) return null
+  return `${yyyy}-${mm}-${dd}`
+}
+
 // MANTER somente helpers de UI necessários no Map (ex.: escapeHtml)
 function escapeHtml(s = '') {
   return String(s).replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))
@@ -271,59 +288,54 @@ export default function MapPage() {
     setCameraOpen(false)
   }
 
-  // Popup ao clicar no mapa para oferecer: Bater foto ou Upload
-function openAddPointPopup(latlng) {
-  const coord = { lat: latlng.lat, lng: latlng.lng }
-  pendingCoordRef.current = coord
-  setPendingCoord(coord)
+  // Popup ao clicar no mapa (textos em inglês)
+  function openAddPointPopup(latlng) {
+    const coord = { lat: latlng.lat, lng: latlng.lng }
+    pendingCoordRef.current = coord
+    setPendingCoord(coord)
 
-  const wrap = document.createElement('div')
-  wrap.style.minWidth = '200px'
+    const wrap = document.createElement('div')
+    wrap.style.minWidth = '200px'
 
-  const title = document.createElement('div')
-  title.style.fontWeight = '600'
-  title.style.marginBottom = '6px'
-  title.textContent = 'Adicionar ponto aqui?'
-  wrap.appendChild(title)
+    const title = document.createElement('div')
+    title.style.fontWeight = '600'
+    title.style.marginBottom = '6px'
+    title.textContent = 'Add point here?'
+    wrap.appendChild(title)
 
-  const coords = document.createElement('div')
-  coords.style.fontSize = '12px'
-  coords.style.color = '#64748b'
-  coords.style.marginBottom = '8px'
-  coords.textContent = `${latlng.lat.toFixed(5)}, ${latlng.lng.toFixed(5)}`
-  wrap.appendChild(coords)
+    const coords = document.createElement('div')
+    coords.style.fontSize = '12px'
+    coords.style.color = '#64748b'
+    coords.style.marginBottom = '8px'
+    coords.textContent = `${latlng.lat.toFixed(5)}, ${latlng.lng.toFixed(5)}`
+    wrap.appendChild(coords)
 
-  const row = document.createElement('div')
-  row.style.display = 'flex'
-  row.style.gap = '6px'
+    const row = document.createElement('div')
+    row.style.display = 'flex'
+    row.style.gap = '6px'
 
-  const btnCam = document.createElement('button')
-  btnCam.className = 'button'
-  btnCam.textContent = 'Bater foto (câmera)'
-  // Remove TODOS os estilos inline para a classe CSS funcionar
-  btnCam.onclick = () => {
-    mapInst.current?.closePopup()
-    startCameraCapture(coord)
+    const btnCam = document.createElement('button')
+    btnCam.className = 'button'
+    btnCam.textContent = 'Take photo (camera)'
+    btnCam.onclick = () => {
+      mapInst.current?.closePopup()
+      startCameraCapture(coord)
+    }
+
+    const btnUpload = document.createElement('button')
+    btnUpload.className = 'button'
+    btnUpload.textContent = 'Upload photo'
+    btnUpload.onclick = () => {
+      mapInst.current?.closePopup()
+      uploadInputRef.current?.click()
+    }
+
+    row.appendChild(btnCam)
+    row.appendChild(btnUpload)
+    wrap.appendChild(row)
+
+    L.popup().setLatLng(latlng).setContent(wrap).openOn(mapInst.current)
   }
-
-  const btnUpload = document.createElement('button')
-  btnUpload.className = 'button'
-  btnUpload.textContent = 'Fazer upload'
-  // Remove TODOS os estilos inline para a classe CSS funcionar
-  btnUpload.onclick = () => {
-    mapInst.current?.closePopup()
-    uploadInputRef.current?.click()
-  }
-
-  // REMOVIDO: botão cancelar
-
-  row.appendChild(btnCam)
-  row.appendChild(btnUpload)
-  // REMOVIDO: row.appendChild(btnCancel)
-  wrap.appendChild(row)
-
-  L.popup().setLatLng(latlng).setContent(wrap).openOn(mapInst.current)
-}
 
   // Substitui o antigo handler condicionado por "selectingCoord" – agora sempre mostra popup
   useEffect(() => {
@@ -509,7 +521,7 @@ function openAddPointPopup(latlng) {
           map.setView(here, focusZoom)
           L.circleMarker(here, {
             radius: 8, color: '#2563eb', weight: 2, fillColor: '#3b82f6', fillOpacity: 0.7
-          }).addTo(map).bindPopup('Você está aqui').openPopup()
+          }).addTo(map).bindPopup('You are here').openPopup()
           if (Number.isFinite(accuracy)) {
             L.circle(here, { radius: accuracy, color: '#60a5fa', weight: 1, fillOpacity: 0.12 }).addTo(map)
           }
@@ -581,13 +593,13 @@ function openAddPointPopup(latlng) {
     }
   }
 
-  // NOVO: submissão do formulário (se ausente)
+  // Submissão
   function onSubmit(e) {
     e.preventDefault()
     const latNum = parseFloat(String(lat).replace(',', '.'))
     const lngNum = parseFloat(String(lng).replace(',', '.'))
-    if (!Number.isFinite(latNum) || !Number.isFinite(lngNum)) return alert('Coordenadas inválidas.')
-    if (latNum < -90 || latNum > 90 || lngNum < -180 || lngNum > 180) return alert('Fora do intervalo válido.')
+    if (!Number.isFinite(latNum) || !Number.isFinite(lngNum)) return alert('Invalid coordinates.')
+    if (latNum < -90 || latNum > 90 || lngNum < -180 || lngNum > 180) return alert('Out of valid range.')
     addPoint(latNum, lngNum, label?.trim(), { save: true, pan: true })
   }
 
@@ -715,24 +727,25 @@ function openAddPointPopup(latlng) {
           >
         {/* Alternador de mapa base */}
         <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ fontSize: 14, color: '#cfdbedff' }}>Visão</span>
+          <span style={{ fontSize: 14, color: '#cfdbedff' }}>View</span>
           <select value={basemap} onChange={(e) => setBasemap(e.target.value)} style={{ padding: '6px 8px' }}>
-            <option value="osm">Mapa padrão (OSM)</option>
-            <option value="gibs">Satélite (NASA)</option>
+            <option value="osm">Default map (OSM)</option>
+            <option value="gibs">Satellite (NASA)</option>
           </select>
         </label>
 
-        {/* Seletor de data (habilitado se basemap GIBS ou overlay NASA ativo) */}
+        {/* Data (abre calendário nativo) */}
         <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ fontSize: 14, color: '#cbe1ffff' }}>Data</span>
+          <span style={{ fontSize: 14, color: '#cbe1ffff' }}>Date</span>
           <input
             type="date"
             value={gibsDate}
             min={GIBS_MIN_DATE}
             max={getGibsDate()}
+            onFocus={() => { if (basemap !== 'gibs') setBasemap('gibs') }}
             onChange={(e) => setGibsDate(clampGibsDate(e.target.value))}
-            disabled={basemap !== 'gibs' && nasaLayer === 'none'}
             style={{ padding: '6px 8px' }}
+            title="Select date to update NASA satellite imagery"
           />
         </label>
 
@@ -746,33 +759,33 @@ function openAddPointPopup(latlng) {
           >
             <option value="viirs_chla">VIIRS SNPP Chlorophyll-a</option>
             <option value="modis_chla">MODIS Aqua Chlorophyll-a</option>
-            <option value="none">Sem overlay</option>
+            <option value="none">No overlay</option>
           </select>
         </label>
 
         <input
-          type="text" inputMode="decimal" placeholder="Lat (-90 a 90)"
+          type="text" inputMode="decimal" placeholder="Lat (-90 to 90)"
           value={lat} onChange={(e) => setLat(e.target.value)}
           style={{ padding: '6px 8px', flex: '1 1 150px', minWidth: 120, boxSizing: 'border-box' }}
         />
         <input
-          type="text" inputMode="decimal" placeholder="Lng (-180 a 180)"
+          type="text" inputMode="decimal" placeholder="Lng (-180 to 180)"
           value={lng} onChange={(e) => setLng(e.target.value)}
           style={{ padding: '6px 8px', flex: '1 1 150px', minWidth: 120, boxSizing: 'border-box' }}
         />
         <input
-          type="text" placeholder="Rótulo (opcional)"
+          type="text" placeholder="Label (optional)"
           value={label} onChange={(e) => setLabel(e.target.value)}
           style={{ padding: '6px 8px', flex: '2 1 220px', minWidth: 160, boxSizing: 'border-box' }}
         />
-        <button type="submit" style={{ padding: '6px 10px', flex: '0 0 auto' }}>Cadastrar ponto</button>
-        <button type="button" onClick={clearPoints} style={{ padding: '6px 10px', flex: '0 0 auto' }}>Limpar</button>
+        <button type="submit" style={{ padding: '6px 10px', flex: '0 0 auto' }}>Add point</button>
+        <button type="button" onClick={clearPoints} style={{ padding: '6px 10px', flex: '0 0 auto' }}>Clear</button>
         <button type="button" onClick={() => setShowList(true)} style={{ padding: '6px 10px', marginLeft: 8, flex: '0 0 auto' }}>
-          Meus pontos
+          My points
         </button>
           <Link to="/">
             <button type="button" style={{ padding: '6px 10px', marginLeft: 8, flex: '0 0 auto' }}>
-          Voltar ao início
+          Back to home
             </button>
           </Link>
       </form>
@@ -817,79 +830,79 @@ function openAddPointPopup(latlng) {
             className="modal"
             role="dialog"
             aria-modal="true"
-            aria-label="Novo ponto por foto"
+            aria-label="New point by photo"
             style={{ width: 'min(640px, 96vw)' }}
           >
             <div className="modal__header">
-              <strong>Novo ponto</strong>
-              <button className="modal__btn" onClick={cancelCapture}>Cancelar</button>
+              <strong>New point</strong>
+              <button className="modal__btn" onClick={cancelCapture}>Cancel</button>
             </div>
 
             <div style={{ display: 'grid', gap: 8 }}>
               <div>
-                <small style={{ color: '#64748b' }}>Coordenadas selecionadas</small><br />
+                <small style={{ color: '#64748b' }}>Selected coordinates</small><br />
                 <span>{pendingCoord ? `${pendingCoord.lat.toFixed(6)}, ${pendingCoord.lng.toFixed(6)}` : '—'}</span>
                 {photoExifCoord && (
                   <div style={{ marginTop: 6, fontSize: 12, color: '#64748b' }}>
-                    EXIF: {photoExifCoord.lat.toFixed(6)}, {photoExifCoord.lng.toFixed(6)} (já aplicado se confirmado)
+                    EXIF: {photoExifCoord.lat.toFixed(6)}, {photoExifCoord.lng.toFixed(6)} (already applied if confirmed)
                   </div>
                 )}
               </div>
 
               {photoDataUrl && (
                 <>
-                <img id='imgPlant' src={photoDataUrl} alt="Pré-visualização da foto" style={{ width: '100%', borderRadius: 8, border: '1px solid #e5e7eb' }} />
+                <img id='imgPlant' src={photoDataUrl} alt="Photo preview" style={{ width: '100%', borderRadius: 8, border: '1px solid #e5e7eb' }} />
                 <div style={{ marginTop: 8 }}>
                   {plantPredLoading && (
-                    <div style={{ color: '#64748b' }}>Identificando espécie…</div>
+                    <div style={{ color: '#64748b' }}>Identifying species…</div>
                   )}
                   {!plantPredLoading && plantPred && (
                     <div>
-                      <div style={{ fontWeight: 600 }}>Espécie provável (nome científico)</div>
+                      <div style={{ fontWeight: 600 }}>Likely species (scientific name)</div>
                       <div style={{ marginTop: 4 }}>
                         {plantPred.label} <span style={{ color: '#64748b' }}>({(plantPred.prob * 100).toFixed(1)}%)</span>
                       </div>
                     </div>
                   )}
                   {!plantPredLoading && !plantPred && (
-                    <div style={{ color: '#94a3b8' }}>Aguardando processamento…</div>
+                    <div style={{ color: '#94a3b8' }}>Waiting for processing…</div>
                   )}
                 </div>
                 </>
               )}
 
               <label style={{ display: 'grid', gap: 6 }}>
-                <span>Título (opcional)</span>
+                <span>Title (optional)</span>
                 <input
                   type="text"
                   value={titleDraft}
                   onChange={(e) => setTitleDraft(e.target.value)}
-                  placeholder="Ex.: Ipê amarelo na praça"
+                  placeholder="e.g., Golden trumpet tree at the square"
                   style={{ padding: 8, borderRadius: 8, border: '1px solid #e5e7eb' }}
                 />
               </label>
 
               <label style={{ display: 'grid', gap: 6 }}>
-                <span>Descrição</span>
+                <span>Description</span>
                 <textarea
                   rows={4}
                   value={descDraft}
                   onChange={(e) => setDescDraft(e.target.value)}
-                  placeholder="Escreva uma descrição da flor/local..."
+                  placeholder="Write a description of the flower/place..."
                   style={{ padding: 8, borderRadius: 8, border: '1px solid #e5e7eb' }}
                 />
               </label>
 
               <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                <button className="modal__btn" onClick={cancelCapture}>Cancelar</button>
-                <button className="modal__btn modal__btn--ok" onClick={saveCapturedPoint}>Salvar ponto</button>
+                <button className="modal__btn" onClick={cancelCapture}>Cancel</button>
+                <button className="modal__btn modal__btn--ok" onClick={saveCapturedPoint}>Save point</button>
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Painel de condições ambientais (flutuante) */}
+      {/* Painel ambiental (textos em inglês) */}
       <div
         style={{
           position: isNarrow ? 'fixed' : 'absolute',
@@ -912,12 +925,10 @@ function openAddPointPopup(latlng) {
         onMouseEnter={(e) => { e.currentTarget.style.opacity = '1' }}
         onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.6' }}
       >
-
-          {/*Mapa*/}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span aria-hidden="true">🌤️</span>
-            <strong style={{ fontSize: 14 }}>Condições ambientais</strong>
+            <strong style={{ fontSize: 14 }}>Environmental conditions</strong>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -927,7 +938,7 @@ function openAddPointPopup(latlng) {
               onClick={() => setEnvCollapsed(v => !v)}
               aria-expanded={!envCollapsed}
               aria-controls="env-panel-content"
-              title={envCollapsed ? 'Expandir' : 'Minimizar'}
+              title={envCollapsed ? 'Expand' : 'Minimize'}
               style={{
                 padding: '6px 10px',
                 border: '1px solid #cbd5e1',
@@ -938,7 +949,7 @@ function openAddPointPopup(latlng) {
                 cursor: 'pointer'
               }}
             >
-              {envCollapsed ? 'Expandir' : 'Minimizar'}
+              {envCollapsed ? 'Expand' : 'Minimize'}
             </button>
 
             <button
@@ -953,9 +964,9 @@ function openAddPointPopup(latlng) {
                 fontSize: 12,
                 cursor: loadingEnv ? 'default' : 'pointer'
               }}
-              title="Atualizar pelas coordenadas do centro do mapa"
+              title="Refresh using the map center coordinates"
             >
-              {loadingEnv ? 'Atualizando…' : 'Atualizar (centro)'}
+              {loadingEnv ? 'Refreshing…' : 'Refresh (center)'}
             </button>
 
             {/* NOVO: Vegetação (500 m) */}
@@ -971,9 +982,9 @@ function openAddPointPopup(latlng) {
                 fontSize: 12,
                 cursor: loadingVeg ? 'default' : 'pointer'
               }}
-              title="Buscar tipos de vegetação num raio de 500 m (OSM)"
+              title="Fetch vegetation types within a 500 m radius (OSM)"
             >
-              {loadingVeg ? 'Buscando…' : 'Vegetação (500 m)'}
+              {loadingVeg ? 'Fetching…' : 'Vegetation (500 m)'}
             </button>
           </div>
         </div>
@@ -982,14 +993,14 @@ function openAddPointPopup(latlng) {
         {!envCollapsed && (
           <div id="env-panel-content">
             <div style={{ fontSize: 12, color: '#64748b', marginTop: 6 }}>
-              Centro: {centerRef.current.lat.toFixed(4)}, {centerRef.current.lng.toFixed(4)}
+              Center: {centerRef.current.lat.toFixed(4)}, {centerRef.current.lng.toFixed(4)}
             </div>
 
             <div style={{ marginTop: 10, display: 'grid', gap: 8 }}>
               {/* Vento */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 <span style={{ color: '#64748b', minWidth: 64, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                  <span aria-hidden="true">🌬️</span> Vento
+                  <span aria-hidden="true">🌬️</span> Wind
                 </span>
                 <span
                   style={{
@@ -1020,7 +1031,7 @@ function openAddPointPopup(latlng) {
               {/* Umidade */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 <span style={{ color: '#64748b', minWidth: 64, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                  <span aria-hidden="true">💧</span> Umidade
+                  <span aria-hidden="true">💧</span> Humidity
                 </span>
                 <span
                   style={{
@@ -1039,7 +1050,7 @@ function openAddPointPopup(latlng) {
               {/* Qualidade do ar */}
               <div style={{ display: 'grid', gap: 6 }}>
                 <span style={{ color: '#64748b', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                  <span aria-hidden="true">🫧</span> Qualidade do ar
+                  <span aria-hidden="true">🫧</span> Air quality
                 </span>
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                   <span
@@ -1084,7 +1095,7 @@ function openAddPointPopup(latlng) {
               {/* Pólen */}
               <div style={{ display: 'grid', gap: 6 }}>
                 <span style={{ color: '#64748b', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                  <span aria-hidden="true">🌿</span> Pólen
+                  <span aria-hidden="true">🌿</span> Pollen
                 </span>
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                   <span
@@ -1097,7 +1108,7 @@ function openAddPointPopup(latlng) {
                       fontSize: 12
                     }}
                   >
-                    Grama {envInfo?.pollen?.grass ?? '—'}
+                    Grass {envInfo?.pollen?.grass ?? '—'}
                   </span>
                   <span
                     style={{
@@ -1109,7 +1120,7 @@ function openAddPointPopup(latlng) {
                       fontSize: 12
                     }}
                   >
-                    Árvores {envInfo?.pollen?.tree ?? '—'}
+                    Trees {envInfo?.pollen?.tree ?? '—'}
                   </span>
                   <span
                     style={{
@@ -1121,7 +1132,7 @@ function openAddPointPopup(latlng) {
                       fontSize: 12
                     }}
                   >
-                    Ervas {envInfo?.pollen?.weed ?? '—'}
+                    Weed {envInfo?.pollen?.weed ?? '—'}
                   </span>
                 </div>
               </div>
@@ -1129,20 +1140,20 @@ function openAddPointPopup(latlng) {
               {/* NOVO: Vegetação próxima (OSM) */}
               <div style={{ display: 'grid', gap: 6 }}>
                 <span style={{ color: '#64748b', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                  <span aria-hidden="true">🌳</span> Vegetação próxima (OSM)
+                  <span aria-hidden="true">🌳</span> Nearby vegetation (OSM)
                 </span>
 
                 {vegInfo ? (
                   <div style={{ display: 'grid', gap: 6 }}>
                     <div style={{ fontSize: 12, color: '#64748b' }}>
-                      Raio: ~{Math.round(vegInfo.radius)} m • Itens: {vegInfo.total}
+                      Radius: ~{Math.round(vegInfo.radius)} m • Items: {vegInfo.total}
                     </div>
 
                     {/* CORREÇÃO: agrupar os dois blocos com um fragmento */}
                     <>
                       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                         {Object.keys(vegInfo.categories).length === 0 && (
-                          <span style={{ color: '#94a3b8' }}>Nenhuma classe encontrada.</span>
+                          <span style={{ color: '#94a3b8' }}>No classes found.</span>
                         )}
                         {Object.entries(vegInfo.categories).map(([k, v]) => (
                           <span
@@ -1163,18 +1174,18 @@ function openAddPointPopup(latlng) {
 
                       {vegInfo.names?.length > 0 && (
                         <div style={{ fontSize: 12, color: '#64748b' }}>
-                          Próximos: {vegInfo.names.join(' · ')}
+                          Nearby: {vegInfo.names.join(' · ')}
                         </div>
                       )}
                     </>
 
                     <div style={{ fontSize: 11, color: '#94a3b8' }}>
-                      Fonte: OpenStreetMap (Overpass) • {new Date(vegInfo.at).toLocaleString()}
+                      Source: OpenStreetMap (Overpass) • {new Date(vegInfo.at).toLocaleString()}
                     </div>
                   </div>
                 ) : (
                   <div style={{ fontSize: 12, color: '#94a3b8' }}>
-                    {loadingVeg ? 'Carregando vegetação…' : 'Clique em “Vegetação (500 m)” para buscar.'}
+                    {loadingVeg ? 'Loading vegetation…' : 'Click “Vegetation (500 m)” to fetch.'}
                   </div>
                 )}
               </div>
@@ -1191,7 +1202,7 @@ function openAddPointPopup(latlng) {
                     display: 'inline-block'
                   }}
                 />
-                {envInfo?.at ? `Atualizado: ${new Date(envInfo.at).toLocaleString()}` : 'Aguardando dados…'}
+                {envInfo?.at ? `Updated: ${new Date(envInfo.at).toLocaleString()}` : 'Waiting for data…'}
               </div>
             </div>
           </div>
@@ -1205,31 +1216,31 @@ function openAddPointPopup(latlng) {
             className="modal"
             role="dialog"
             aria-modal="true"
-            aria-label="Pontos cadastrados"
+            aria-label="Saved points"
             style={{ width: 'min(640px, 96vw)' }}
           >
             <div className="modal__header">
-              <strong>Pontos cadastrados</strong>
-              <button className="modal__btn" onClick={() => setShowList(false)}>Fechar</button>
+              <strong>Saved points</strong>
+              <button className="modal__btn" onClick={() => setShowList(false)}>Close</button>
             </div>
 
             <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 6 }}>
-              <small style={{ color: '#64748b' }}>{points.length} itens</small>
-              <button className="modal__btn" onClick={() => refreshPoints({ pan: false })}>Atualizar</button>
+              <small style={{ color: '#64748b' }}>{points.length} items</small>
+              <button className="modal__btn" onClick={() => refreshPoints({ pan: false })}>Refresh</button>
             </div>
 
-            {points.length === 0 && <div style={{ color: '#94a3b8' }}>Nenhum ponto cadastrado.</div>}
+            {points.length === 0 && <div style={{ color: '#94a3b8' }}>No points saved.</div>}
 
             {points.map(p => (
               <div key={p.id} className="modal__list-item">
                 <div style={{ display: 'grid' }}>
-                  <span style={{ fontWeight: 600 }}>{p.label?.trim() || '(sem rótulo)'}</span>
+                  <span style={{ fontWeight: 600 }}>{p.label?.trim() || '(no label)'}</span>
                   <small style={{ color: '#64748b' }}>{p.lat.toFixed(5)}, {p.lng.toFixed(5)}</small>
                 </div>
                 <div style={{ display: 'flex', gap: 6 }}>
-                  <button className="modal__btn modal__btn--ok" onClick={() => handleShow(p.id)}>Mostrar</button>
-                  <button className="modal__btn" onClick={() => handleEdit(p.id)}>Editar</button>
-                  <button className="modal__btn modal__btn--warn" onClick={() => handleDelete(p.id)}>Excluir</button>
+                  <button className="modal__btn modal__btn--ok" onClick={() => handleShow(p.id)}>Show</button>
+                  <button className="modal__btn" onClick={() => handleEdit(p.id)}>Edit</button>
+                  <button className="modal__btn modal__btn--warn" onClick={() => handleDelete(p.id)}>Delete</button>
                 </div>
               </div>
             ))}
@@ -1248,31 +1259,30 @@ function openAddPointPopup(latlng) {
             className="modal isplant-modal"
             role="dialog"
             aria-modal="true"
-            aria-label="Imagem não reconhecida como planta"
+            aria-label="Image not recognized as plant"
           >
             <div className="modal__header isplant-modal__header">
               <div className="isplant-header-left">
                 <div aria-hidden="true" className="isplant-icon">🌱</div>
-                <strong>Não parece uma planta</strong>
+                <strong>Doesn’t look like a plant</strong>
               </div>
-              {/* botão de fechar removido */}
             </div>
 
             <div className="isplant-modal__content">
               <p className="isplant-text">{gateMsg}</p>
 
               <ul className="isplant-tips">
-                <li>Preencha o quadro com a planta (evite fundo dominante).</li>
-                <li>Prefira boa iluminação e foco nas folhas/flores.</li>
-                <li>Evite pessoas/animais/objetos ocupando a maior área.</li>
+                <li>Fill the frame with the plant (avoid dominant background).</li>
+                <li>Prefer good lighting and focus on leaves/flowers.</li>
+                <li>Avoid people/animais/objetos ocupando a maior área.</li>
               </ul>
 
               <div className="isplant-actions">
                 <button className="modal__btn" onClick={handleGateExit}>
-                  Sair
+                  Exit
                 </button>
                 <button className="modal__btn modal__btn--ok" onClick={handleGateContinue}>
-                  Continuar assim mesmo
+                  Continue anyway
                 </button>
               </div>
             </div>

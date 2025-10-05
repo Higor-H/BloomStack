@@ -74,13 +74,29 @@ function BarList({ data, valueSuffix = '', maxBarWidth = 360 }) {
 export default function ChartsPage() {
   const allPoints = useMemo(loadPointsFromStorage, [])
 
-  // Filtros simples (mesmo “look” do Map.jsx)
+  // NOVO: limites de data (min/max) baseados nos dados
+  const { minDateISO, maxDateISO } = useMemo(() => {
+    let min = null, max = null
+    for (const p of allPoints) {
+      const dtIso = p.capturedAt || p.createdAt
+      if (!dtIso) continue
+      const d = new Date(dtIso)
+      if (Number.isNaN(d.getTime())) continue
+      const iso = d.toISOString().slice(0, 10)
+      if (!min || iso < min) min = iso
+      if (!max || iso > max) max = iso
+    }
+    // fallback para hoje se não houver dados
+    const today = new Date().toISOString().slice(0, 10)
+    return { minDateISO: min || today, maxDateISO: max || today }
+  }, [allPoints])
+
+  // Filtros com calendário (ISO YYYY-MM-DD)
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [groupMode, setGroupMode] = useState('month') // 'month' | 'season'
 
   const points = useMemo(() => {
-    if (!startDate && !endDate) return allPoints
     const s = startDate ? new Date(startDate).getTime() : null
     const e = endDate ? new Date(endDate).getTime() : null
     return allPoints.filter(p => {
@@ -92,14 +108,8 @@ export default function ChartsPage() {
   }, [allPoints, startDate, endDate])
 
   const {
-    total,
-    withSci,
-    withoutSci,
-    uniqueSpecies,
-    speciesTop,
-    monthsSeries,
-    seasonsSeries,
-    envAverages
+    total, withSci, withoutSci, uniqueSpecies,
+    speciesTop, monthsSeries, seasonsSeries, envAverages
   } = useMemo(() => {
     const total = points.length
     const norm = (s) => (s || '').trim().toLowerCase()
@@ -132,7 +142,7 @@ export default function ChartsPage() {
     const monthsSeries = [...monthMap.entries()].map(([label, value]) => ({ label, value }))
       .sort((a, b) => a.label.localeCompare(b.label))
 
-    // Série por estação (considera hemisfério pela latitude)
+    // Série por estação em inglês
     const seasonMap = new Map()
     const addSeason = (label) => seasonMap.set(label, (seasonMap.get(label) || 0) + 1)
     for (const p of points) {
@@ -143,21 +153,21 @@ export default function ChartsPage() {
       const south = typeof p.lat === 'number' && p.lat < 0
       let season
       if (south) {
-        // Sul: Verão(12-2), Outono(3-5), Inverno(6-8), Primavera(9-11)
-        if (m === 11 || m === 0 || m === 1) season = 'Verão'
-        else if (m >= 2 && m <= 4) season = 'Outono'
-        else if (m >= 5 && m <= 7) season = 'Inverno'
-        else season = 'Primavera'
+        // Sul: Summer(12-2), Autumn(3-5), Winter(6-8), Spring(9-11)
+        if (m === 11 || m === 0 || m === 1) season = 'Summer'
+        else if (m >= 2 && m <= 4) season = 'Autumn'
+        else if (m >= 5 && m <= 7) season = 'Winter'
+        else season = 'Spring'
       } else {
-        // Norte: Inverno(12-2), Primavera(3-5), Verão(6-8), Outono(9-11)
-        if (m === 11 || m === 0 || m === 1) season = 'Inverno'
-        else if (m >= 2 && m <= 4) season = 'Primavera'
-        else if (m >= 5 && m <= 7) season = 'Verão'
-        else season = 'Outono'
+        // Norte: Winter(12-2), Spring(3-5), Summer(6-8), Autumn(9-11)
+        if (m === 11 || m === 0 || m === 1) season = 'Winter'
+        else if (m >= 2 && m <= 4) season = 'Spring'
+        else if (m >= 5 && m <= 7) season = 'Summer'
+        else season = 'Autumn'
       }
       addSeason(season)
     }
-    const order = ['Primavera', 'Verão', 'Outono', 'Inverno']
+    const order = ['Spring', 'Summer', 'Autumn', 'Winter']
     const seasonsSeries = order.filter(l => seasonMap.has(l)).map(l => ({ label: l, value: seasonMap.get(l) }))
 
     // médias ambientais
@@ -230,11 +240,27 @@ export default function ChartsPage() {
       <form className="map-form" style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', marginBottom: 8 }}>
         <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <span style={{ fontSize: 14, color: '#cfdbedff' }}>Start</span>
-          <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} style={{ padding: '6px 8px' }} />
+          <input
+            type="date"
+            value={startDate}
+            min={minDateISO}
+            max={maxDateISO}
+            onChange={(e) => setStartDate(e.target.value)}
+            style={{ padding: '6px 8px' }}
+            title="Select start date"
+          />
         </label>
         <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <span style={{ fontSize: 14, color: '#cfdbedff' }}>End</span>
-          <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} style={{ padding: '6px 8px' }} />
+          <input
+            type="date"
+            value={endDate}
+            min={minDateISO}
+            max={maxDateISO}
+            onChange={(e) => setEndDate(e.target.value)}
+            style={{ padding: '6px 8px' }}
+            title="Select end date"
+          />
         </label>
         <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <span style={{ fontSize: 14, color: '#cfdbedff' }}>Group by</span>
