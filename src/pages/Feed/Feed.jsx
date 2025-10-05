@@ -39,18 +39,18 @@ export default function FeedPage() {
 
       <div className="glass-card feed-card">
         <div className="feed-header">
-          <h1>Feed de flores</h1>
+          <h1>Flowers feed</h1>
           <div className="feed-actions">
-            <Link to="/"> <button className="button"> Início </button> </Link>
-            <Link to="/maps"> <button className="button"> Mapa </button> </Link>
-            <button className="button" onClick={refresh}>Atualizar</button>
+            <Link to="/"> <button className="button"> Home </button> </Link>
+            <Link to="/maps"> <button className="button"> Map </button> </Link>
+            <button className="button" onClick={refresh}>Update</button>
           </div>
         </div>
 
-        <small className="feed-subtitle">{items.length} registros</small>
+        <small className="feed-subtitle">{items.length} registers</small>
 
         {items.length === 0 && (
-          <div className="feed-empty">Nenhum ponto cadastrado.</div>
+          <div className="feed-empty">No points registered.</div>
         )}
 
         <div className="feed-grid">

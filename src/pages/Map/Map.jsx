@@ -154,7 +154,7 @@ export default function MapPage() {
       });
 
       if (!decision.ok && !gateBypass) {
-        setGateMsg('A imagem não parece ser uma planta. Você pode sair ou continuar mesmo assim.');
+        setGateMsg("The image doesn't appear to be a plant. You can exit or continue anyway.");
         setGateOpen(true);
         // Não fecha a captura, apenas mostra o popup e aguarda ação do usuário
         return;
