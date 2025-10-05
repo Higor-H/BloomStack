@@ -1,5 +1,4 @@
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
+import BloomImage from './assets/Bloom_6.png';
 import './Home.css'
 import {Link} from "react-router-dom";
 import { useEffect } from "react";
@@ -32,14 +31,8 @@ function Home() {
         </div>
       <div className="glass-card">
           <div>
-              <a href="https://vite.dev" target="_blank">
-                  <img src={viteLogo} className="logo" alt="Vite logo" />
-              </a>
-              <a href="https://react.dev" target="_blank">
-                  <img src={reactLogo} className="logo react" alt="React logo" />
-              </a>
+                  <img src={BloomImage} className="logo" alt="Bloom logo" />
           </div>
-          <h1>BloomStack</h1>
           <div className="card">
               <Link to="/maps">
                   <button>Ir para Maps</button>

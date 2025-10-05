@@ -1,24 +1,18 @@
 .logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
+    height: 25em; /* aumentei a logo inicial */
+    padding: 1.5em;
+    will-change: transform, filter;
+    transition: transform 0.3s ease-in-out, filter 0.6s ease-in-out;
 }
 
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+.logo:hover {
+    transform: scale(1.2); /* aumenta a imagem em 20% */
+    filter:
+            drop-shadow(0 0 1em rgba(102, 51, 153, 0.7))  /* brilho suave */
+            drop-shadow(0 0 3em rgba(102, 51, 153, 0.7))  /* brilho médio */
+            drop-shadow(0 0 5em rgba(102, 51, 153, 0.7)); /* brilho intenso */
 }
+
 
 @media (prefers-reduced-motion: no-preference) {
   a:nth-of-type(2) .logo {
@@ -27,8 +21,10 @@
 }
 
 .card {
-  padding: 2em;
+    margin-bottom: 3em;       /* mantém o padding interno */
+    margin-top: 1em;  /* diminui a distância do topo */
 }
+
 
 .read-the-docs {
   color: #888;
