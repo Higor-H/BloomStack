@@ -164,7 +164,7 @@ export default function MapPage() {
       });
 
       if (!decision.ok && !gateBypass) {
-        setGateMsg('A imagem não parece ser uma planta. Você pode sair ou continuar mesmo assim.');
+        setGateMsg("The image doesn't appear to be a plant. You can exit or continue anyway.");
         setGateOpen(true);
         // Não fecha a captura, apenas mostra o popup e aguarda ação do usuário
         return;
@@ -175,7 +175,7 @@ export default function MapPage() {
       
       // normalização: trate "Nenhum nome científico encontrado" como vazio
       const rawLabel = (res?.label || '').trim();
-      const noneLike = /nenhum nome científico encontrado/i.test(rawLabel);
+      const noneLike = /No scientific name found/i.test(rawLabel);
       const suggested = noneLike ? '' : rawLabel;
       const prob = Number.isFinite(res?.prob) ? res.prob : null;
 
@@ -900,7 +900,7 @@ export default function MapPage() {
                 <img id='imgPlant' src={photoDataUrl} alt="Pré-visualização da foto" style={{ width: '100%', borderRadius: 8, border: '1px solid #e5e7eb' }} />
                {!plantPredLoading && (
                         <label style={{ display: 'grid', gap: 6, marginTop: 8 }}>
-                          <span>Nome Científico</span>
+                          <span>Scientific Name</span>
 
                           {/* badges */}
                           {(() => {
@@ -908,13 +908,13 @@ export default function MapPage() {
                             if (hasSuggestion && Number.isFinite(sciSuggestedProb)) {
                               return (
                                 <span className="modal__btn--ok badge_suggestion">
-                                  Encontrado nome científico provável ({(sciSuggestedProb * 100).toFixed(1)}%)
+                                  Probable scientific name found ({(sciSuggestedProb * 100).toFixed(1)}%)
                                 </span>
                               );
                             }
                             return (
                               <span className="modal__btn--warn badge_suggestion">
-                                Nenhuma sugestão encontrada
+                                No suggestions found
                               </span>
                             );
                           })()}
@@ -923,7 +923,7 @@ export default function MapPage() {
                             <input
                               type="text"
                               placeholder="Ex.: Handroanthus albus"
-                              value={sciNameDraft === 'Nenhum nome científico encontrado' ? '' : sciNameDraft}
+                              value={sciNameDraft === 'No scientific name found' ? '' : sciNameDraft}
                               onChange={(e) => setSciNameDraft(e.target.value)}
                               style={{ flex: 1, padding: 8, borderRadius: 8, border: '1px solid #e5e7eb' }}
                             />
