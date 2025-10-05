@@ -6,15 +6,17 @@
   width: min(1100px, 92vw);
   padding: 24px;
   border-radius: 16px;
-  /*border: 1px solid rgba(226, 232, 240, 0.8);*/
-    background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.05);
   backdrop-filter: blur(10px);
   box-shadow: 0 20px 50px rgba(2, 6, 23, 0.15);
+  min-height: 60vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
 /* Cabeçalho do feed */
 .feed-header {
-  /* display: flex; */
   align-items: center;
   justify-content: space-between;
   gap: 12px;
@@ -103,4 +105,75 @@
 .meta .coords {
   font-size: 12px;
   color: #64748b;
+}
+
+/* ===== Responsividade ===== */
+@media (max-width: 900px) {
+  .glass-card.feed-card {
+    width: min(98vw, 700px);
+    padding: 16px;
+  }
+  .feed-header h1 {
+    font-size: 22px;
+    margin-bottom: 14px;
+  }
+  .feed-grid {
+    gap: 10px;
+  }
+}
+
+@media (max-width: 600px) {
+  .glass-card.feed-card {
+    width: 98vw;
+    padding: 10px;
+    margin: 16px auto;
+    border-radius: 10px;
+  }
+  .feed-header h1 {
+    font-size: 18px;
+    margin-bottom: 10px;
+  }
+  .feed-actions {
+    gap: 4px;
+  }
+  .btn, .btn-link {
+    font-size: 12px;
+    padding: 6px 8px;
+    border-radius: 8px;
+  }
+  .feed-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .feed-item {
+    grid-template-columns: 50px 1fr;
+    gap: 6px;
+    padding: 7px;
+    border-radius: 8px;
+  }
+  .thumb {
+    width: 50px;
+    height: 50px;
+    border-radius: 8px;
+  }
+}
+
+@media (max-width: 400px) {
+  .glass-card.feed-card {
+    padding: 4px;
+    border-radius: 6px;
+  }
+  .feed-header h1 {
+    font-size: 15px;
+  }
+  .feed-item {
+    padding: 4px;
+    border-radius: 6px;
+    font-size: 13px;
+  }
+  .thumb {
+    width: 36px;
+    height: 36px;
+    border-radius: 6px;
+  }
 }
