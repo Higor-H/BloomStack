@@ -1,17 +1,14 @@
 .map-page {
   padding: 0.5rem;
 }
-
 .map-root {
-  height: calc(100vh - 100px); /* ocupa a tela */
+  height: calc(100vh - 100px);
   min-height: 360px;
   border: 1px solid #e5e7eb;
   border-radius: 12px;
   overflow: hidden;
   box-shadow: 0 4px 18px rgba(0,0,0,.06);
 }
-
-/* Melhor leitura dos controles do Leaflet */
 .leaflet-control-attribution,
 .leaflet-control-scale {
   font-size: 11px;
@@ -20,7 +17,6 @@
   border-radius: 6px;
   padding: 2px 6px;
 }
-
 .modal-overlay {
   position: fixed;
   inset: 0;
@@ -30,7 +26,6 @@
   justify-content: center;
   z-index: 9999;
 }
-
 .modal {
   background: #fff;
   width: 440px;
@@ -42,7 +37,6 @@
   box-shadow: 0 10px 30px rgba(0,0,0,.18);
   padding: 12px;
 }
-
 .modal__header {
   display: flex;
   align-items: center;
@@ -50,7 +44,6 @@
   gap: 8px;
   margin-bottom: 8px;
 }
-
 .modal__list-item {
   display: flex;
   align-items: center;
@@ -59,7 +52,6 @@
   padding: 8px 4px;
   border-bottom: 1px solid #f1f5f9;
 }
-
 .modal__btn {
   padding: 4px 8px;
   border: 1px solid #e5e7eb;
@@ -67,6 +59,345 @@
   background: #114e8b;
   cursor: pointer;
 }
-
 .modal__btn--warn { background: #f43939; }
 .modal__btn--ok { background: #b0f527; }
+
+/* ===== RESPONSIVIDADE PARA O MAP.JSX (funciona com estilos inline) ===== */
+
+/* Tablets (768px - 1024px) */
+@media (max-width: 1024px) {
+  .map-page {
+    padding: 0.4rem;
+  }
+  
+  .map-root {
+    min-height: 300px;
+  }
+}
+
+/* Tablets pequenos e celulares grandes (480px - 768px) */
+@media (max-width: 768px) {
+  .map-page {
+    padding: 0.3rem;
+  }
+
+  .map-form {
+    gap: 6px !important;
+  }
+
+  .map-form label span {
+    font-size: 13px !important;
+  }
+
+  .map-form select,
+  .map-form input,
+  .map-form button {
+    font-size: 13px !important;
+    padding: 5px 7px !important;
+  }
+
+  .map-root {
+    min-height: 280px;
+  }
+
+  /* Painel ambiental em telas médias */
+  div[style*="position"][style*="absolute"] {
+    right: 10px !important;
+    bottom: 60px !important;
+    max-width: 300px !important;
+  }
+}
+
+/* Celulares (até 480px) */
+@media (max-width: 480px) {
+  .map-page {
+    padding: 0.25rem;
+  }
+
+  .map-form {
+    gap: 4px !important;
+  }
+
+  .map-form label {
+    flex: 1 1 100% !important;
+    justify-content: space-between;
+  }
+
+  .map-form select,
+  .map-form input[type="date"] {
+    flex: 1 !important;
+  }
+
+  .map-form input[type="text"] {
+    flex: 1 1 100% !important;
+    width: 100% !important;
+    min-width: 100% !important;
+  }
+
+  .map-form button,
+  .map-form a button {
+    flex: 1 1 calc(50% - 4px) !important;
+    font-size: 12px !important;
+    padding: 5px 8px !important;
+  }
+
+  .map-root {
+    min-height: 250px;
+    border-radius: 8px;
+  }
+
+  /* Painel ambiental em mobile - ocupa largura total */
+  div[style*="position"][style*="isNarrow"] {
+    left: 6px !important;
+    right: 6px !important;
+    bottom: 6px !important;
+    width: calc(100% - 12px) !important;
+    max-width: none !important;
+    padding: 10px !important;
+  }
+
+  /* Ajusta fonte dos badges no painel */
+  div[style*="padding: '4px 8px'"][style*="borderRadius: 999"] {
+    font-size: 11px !important;
+    padding: 3px 6px !important;
+  }
+
+  /* Modal em mobile */
+  .modal {
+    width: 95vw !important;
+    max-height: 90vh !important;
+    padding: 10px !important;
+  }
+
+  .modal__list-item {
+    flex-direction: column;
+    align-items: flex-start !important;
+  }
+
+  .modal__list-item > div:last-child {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 4px;
+  }
+}
+
+/* Landscape em telas pequenas */
+@media (max-height: 500px) and (orientation: landscape) {
+  .map-page {
+    padding: 0.2rem;
+  }
+
+  .map-form {
+    margin-bottom: 4px !important;
+  }
+
+  .map-root {
+    min-height: 200px;
+  }
+
+  /* Painel com scroll em landscape */
+  div[style*="position: absolute"] {
+    max-height: 180px;
+    overflow-y: auto;
+  }
+}
+
+/* Telas muito pequenas (< 360px) */
+@media (max-width: 360px) {
+  .map-form label span {
+    font-size: 12px !important;
+  }
+
+  .map-form select,
+  .map-form input,
+  .map-form button {
+    font-size: 11px !important;
+    padding: 4px 6px !important;
+  }
+
+  .map-root {
+    min-height: 220px;
+  }
+}
+
+/* ===== FIX PARA LEAFLET CONTROLS EM MOBILE ===== */
+@media (max-width: 768px) {
+  .leaflet-control-zoom {
+    margin-top: 60px !important;
+  }
+  
+  .leaflet-control-attribution {
+    font-size: 9px !important;
+    max-width: 60% !important;
+  }
+}/* ===== RESPONSIVIDADE PARA O MAP.JSX (funciona com estilos inline) ===== */
+
+/* Tablets (768px - 1024px) */
+@media (max-width: 1024px) {
+  .map-page {
+    padding: 0.4rem;
+  }
+  
+  .map-root {
+    min-height: 300px;
+  }
+}
+
+/* Tablets pequenos e celulares grandes (480px - 768px) */
+@media (max-width: 768px) {
+  .map-page {
+    padding: 0.3rem;
+  }
+
+  .map-form {
+    gap: 6px !important;
+  }
+
+  .map-form label span {
+    font-size: 13px !important;
+  }
+
+  .map-form select,
+  .map-form input,
+  .map-form button {
+    font-size: 13px !important;
+    padding: 5px 7px !important;
+  }
+
+  .map-root {
+    min-height: 280px;
+  }
+
+  /* Painel ambiental em telas médias */
+  div[style*="position"][style*="absolute"] {
+    right: 10px !important;
+    bottom: 60px !important;
+    max-width: 300px !important;
+  }
+}
+
+/* Celulares (até 480px) */
+@media (max-width: 480px) {
+  .map-page {
+    padding: 0.25rem;
+  }
+
+  .map-form {
+    gap: 4px !important;
+  }
+
+  .map-form label {
+    flex: 1 1 100% !important;
+    justify-content: space-between;
+  }
+
+  .map-form select,
+  .map-form input[type="date"] {
+    flex: 1 !important;
+  }
+
+  .map-form input[type="text"] {
+    flex: 1 1 100% !important;
+    width: 100% !important;
+    min-width: 100% !important;
+  }
+
+  .map-form button,
+  .map-form a button {
+    flex: 1 1 calc(50% - 4px) !important;
+    font-size: 12px !important;
+    padding: 5px 8px !important;
+  }
+
+  .map-root {
+    min-height: 250px;
+    border-radius: 8px;
+  }
+
+  /* Painel ambiental em mobile - ocupa largura total */
+  div[style*="position"][style*="isNarrow"] {
+    left: 6px !important;
+    right: 6px !important;
+    bottom: 6px !important;
+    width: calc(100% - 12px) !important;
+    max-width: none !important;
+    padding: 10px !important;
+  }
+
+  /* Ajusta fonte dos badges no painel */
+  div[style*="padding: '4px 8px'"][style*="borderRadius: 999"] {
+    font-size: 11px !important;
+    padding: 3px 6px !important;
+  }
+
+  /* Modal em mobile */
+  .modal {
+    width: 95vw !important;
+    max-height: 90vh !important;
+    padding: 10px !important;
+  }
+
+  .modal__list-item {
+    flex-direction: column;
+    align-items: flex-start !important;
+  }
+
+  .modal__list-item > div:last-child {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 4px;
+  }
+}
+
+/* Landscape em telas pequenas */
+@media (max-height: 500px) and (orientation: landscape) {
+  .map-page {
+    padding: 0.2rem;
+  }
+
+  .map-form {
+    margin-bottom: 4px !important;
+  }
+
+  .map-root {
+    min-height: 200px;
+  }
+
+  /* Painel com scroll em landscape */
+  div[style*="position: absolute"] {
+    max-height: 180px;
+    overflow-y: auto;
+  }
+}
+
+/* Telas muito pequenas (< 360px) */
+@media (max-width: 360px) {
+  .map-form label span {
+    font-size: 12px !important;
+  }
+
+  .map-form select,
+  .map-form input,
+  .map-form button {
+    font-size: 11px !important;
+    padding: 4px 6px !important;
+  }
+
+  .map-root {
+    min-height: 220px;
+  }
+}
+
+/* ===== FIX PARA LEAFLET CONTROLS EM MOBILE ===== */
+@media (max-width: 768px) {
+  .leaflet-control-zoom {
+    margin-top: 60px !important;
+  }
+  
+  .leaflet-control-attribution {
+    font-size: 9px !important;
+    max-width: 60% !important;
+  }
+}
