@@ -1,285 +1,23 @@
 import React, { useEffect, useRef } from 'react';
 import './Story.css';
 
-function PetalsCanvas() {
-  const canvasRef = useRef(null);
-  const rafRef = useRef(0);
-  const petalsRef = useRef([]);
-  const mouseXRef = useRef(0);
-  const mouseYRef = useRef(0); // NOVO
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d', { alpha: true });
-
-    function setSize() {
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      const w = canvas.clientWidth;
-      const h = canvas.clientHeight;
-      canvas.width = Math.floor(w * dpr);
-      canvas.height = Math.floor(h * dpr);
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    }
-    setSize();
-
-    const TOTAL = 110;
-
-    // NOVO: desenha uma pétala vetorial com gradiente
-    function drawPetalShape(x, y, w, h, rot, opacity, tintHue) {
-      ctx.save();
-      ctx.translate(x, y);
-      ctx.rotate(rot);
-
-      const grad = ctx.createLinearGradient(0, -h, 0, 0);
-      // variação leve de cor por pétala
-      const c1 = `hsla(${tintHue}, 85%, 90%, ${opacity})`;
-      const c2 = `hsla(${tintHue + 10}, 75%, 70%, ${Math.max(0.5, opacity - 0.2)})`;
-      grad.addColorStop(0, c1);
-      grad.addColorStop(1, c2);
-      ctx.fillStyle = grad;
-      ctx.strokeStyle = `hsla(${tintHue}, 30%, 40%, ${opacity * 0.35})`;
-      ctx.lineWidth = 0.8;
-
-      // forma tipo gota/pétala
-      ctx.beginPath();
-      ctx.moveTo(0, 0);
-      ctx.quadraticCurveTo(w * 0.55, -h * 0.55, 0, -h);
-      ctx.quadraticCurveTo(-w * 0.55, -h * 0.55, 0, 0);
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
-
-      ctx.restore();
-    }
-
-    class Petal {
-      constructor() {
-        this.reset(true);
-      }
-      reset(first = false) {
-        // nasce fora da tela à esquerda
-        this.x = -40 - Math.random() * (canvas.clientWidth * 0.25);
-        this.y = first
-          ? Math.random() * canvas.clientHeight
-          : Math.random() * canvas.clientHeight;
-
-        const base = window.innerWidth < 480 ? 16 : 22;
-        this.w = base + Math.random() * 14;
-        this.h = base * 0.8 + Math.random() * 10;
-        this.opacity = 0.6 + Math.random() * 0.4;
-        this.hue = 330 + Math.floor(Math.random() * 20); // tons de rosa
-        // vento predominante (esq -> dir)
-        this.xSpeed = 1.8 + Math.random() * 2.2;
-        this.ySpeed = 0.15 + Math.random() * 0.55;
-        // oscilação + rotação
-        this.swayPhase = Math.random() * Math.PI * 2;
-        this.swaySpeed = 0.01 + Math.random() * 0.02;
-        this.rot = Math.random() * Math.PI;
-        this.rotSpeed = 0.01 + Math.random() * 0.03;
-      }
-      draw() {
-        drawPetalShape(this.x, this.y, this.w, this.h, this.rot, this.opacity, this.hue);
-      }
-      animate() {
-        // vento com influência do mouse
-        const wx = (mouseXRef.current - 0.5) * 10;
-        const wy = (mouseYRef.current - 0.5) * 2;
-        this.x += this.xSpeed + wx * 0.6;
-        this.swayPhase += this.swaySpeed;
-        this.y += this.ySpeed + Math.sin(this.swayPhase) * 0.8 + wy * 0.4;
-        this.rot += this.rotSpeed;
-
-        // reciclar quando sair
-        if (this.x > canvas.clientWidth + 60 || this.y > canvas.clientHeight + 60) {
-          this.reset();
-        }
-        this.draw();
-      }
-    }
-
-    function init() {
-      petalsRef.current = [];
-      for (let i = 0; i < TOTAL; i++) petalsRef.current.push(new Petal());
-    }
-
-    function render() {
-      ctx.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
-      petalsRef.current.forEach(p => p.animate());
-      rafRef.current = window.requestAnimationFrame(render);
-    }
-
-    function onResize() { setSize(); }
-    function touchHandler(e) {
-      const cx = e?.clientX ?? e?.touches?.[0]?.clientX ?? 0;
-      const cy = e?.clientY ?? e?.touches?.[0]?.clientY ?? 0;
-      mouseXRef.current = cx / window.innerWidth;
-      mouseYRef.current = cy / window.innerHeight;
-    }
-
-    // sem imagem externa: inicia direto
-    init();
-    render();
-
-    window.addEventListener('resize', onResize, { passive: true });
-    window.addEventListener('mousemove', touchHandler, { passive: true });
-    window.addEventListener('touchmove', touchHandler, { passive: true });
-
-    return () => {
-      window.removeEventListener('resize', onResize);
-      window.removeEventListener('mousemove', touchHandler);
-      window.removeEventListener('touchmove', touchHandler);
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
-    };
-  }, []);
-
-  return <canvas ref={canvasRef} className="story-canvas story-canvas--fixed" />;
-}
-
-// NOVO: flores animadas para a sessão 3
-function TreesFlowers({ count = 12 }) {
-  const wrapRef = useRef(null);
-  const hoverTimersRef = useRef(new Map());
-  const lastSpawnRef = useRef(new Map());
-
-  useEffect(() => {
-    const html = document.documentElement;
-    const section = document.getElementById('trees');
-    if (!section) return;
-
-    const el = wrapRef.current;
-
-    // habilita animações das flores e oculta pétalas na sessão 3
-    const io = new IntersectionObserver(
-      ([entry]) => {
-        if (el) {
-          if (entry.isIntersecting) el.classList.add('in');
-          else el.classList.remove('in');
-        }
-        if (entry.isIntersecting) html.classList.add('story-no-petals');
-        else html.classList.remove('story-no-petals');
-      },
-      { threshold: 0.35 }
-    );
-    io.observe(section);
-
-    // NOVO: interação de hover + partículas
-    function markHovered(flower) {
-      if (!flower) return;
-      flower.classList.add('is-hovered');
-      const tm = hoverTimersRef.current.get(flower);
-      if (tm) clearTimeout(tm);
-      const t = setTimeout(() => flower.classList.remove('is-hovered'), 180);
-      hoverTimersRef.current.set(flower, t);
-    }
-    function spawnPollen(flower, n = 3) {
-      const now = Date.now();
-      const last = lastSpawnRef.current.get(flower) || 0;
-      if (now - last < 120) return;
-      lastSpawnRef.current.set(flower, now);
-
-      const bloom = flower.querySelector('.tf-bloom') || flower;
-      for (let i = 0; i < n; i++) {
-        const p = document.createElement('span');
-        p.className = 'tf-pollen';
-        // deslocamento aleatório
-        const tx = (Math.random() * 46 - 23).toFixed(1) + 'px'  // -23..23
-        const ty = (-30 - Math.random() * 40).toFixed(1) + 'px' // -30..-70
-        const delay = (Math.random() * 0.12).toFixed(2) + 's'
-        const scale = (0.6 + Math.random() * 0.4).toFixed(2)
-        p.style.setProperty('--tx', tx)
-        p.style.setProperty('--ty', ty)
-        p.style.setProperty('--pd', delay)
-        p.style.setProperty('--ps', scale)
-        bloom.appendChild(p)
-        const remove = () => p.remove()
-        p.addEventListener('animationend', remove, { once: true })
-      }
-    }
-    function onPointerMove(e) {
-      const target = e.target?.closest?.('.tree-flower')
-      if (!target || !el?.contains(target)) return
-      markHovered(target)
-      spawnPollen(target, 2 + Math.floor(Math.random() * 2))
-    }
-    function onPointerLeave() {
-      // limpa classe hover após sair da área
-      el.querySelectorAll('.tree-flower.is-hovered').forEach(f => f.classList.remove('is-hovered'))
-    }
-
-    el?.addEventListener('pointermove', onPointerMove)
-    el?.addEventListener('pointerleave', onPointerLeave)
-
-    return () => {
-      html.classList.remove('story-no-petals')
-      io.disconnect()
-      el?.removeEventListener('pointermove', onPointerMove)
-      el?.removeEventListener('pointerleave', onPointerLeave)
-      hoverTimersRef.current.forEach(t => clearTimeout(t))
-      hoverTimersRef.current.clear()
-      lastSpawnRef.current.clear()
-    }
-  }, []);
-
-  const items = Array.from({ length: count }).map((_, i) => {
-    const left = 6 + Math.random() * 88 // %
-    const h = 110 + Math.random() * 120 // px
-    const delay = 0.08 * i + Math.random() * 0.15
-    const hue = 315 + Math.floor(Math.random() * 30) // rosas/lilás
-    const sway = (Math.random() * 2 - 1).toFixed(2)  // variação no balanço
-    return { left, h, delay, hue, sway }
-  });
-
-  return (
-    <div ref={wrapRef} className="trees-flowers" aria-hidden="true">
-      {items.map((f, idx) => (
-        <div
-          key={idx}
-          className="tree-flower"
-          style={{
-            left: `${f.left}%`,
-            ['--h']: `${f.h}px`,
-            ['--d']: `${f.delay}s`,
-            ['--hue']: f.hue,
-            ['--sway']: f.sway
-          }}
-        >
-          <div className="tf-stem" />
-          <div className="tf-leaf tf-leaf--l" />
-          <div className="tf-leaf tf-leaf--r" />
-          <div className="tf-bloom">
-            {Array.from({ length: 12 }).map((__, i) => (
-              <span key={i} className="tf-petal" style={{ ['--i']: i }} />
-            ))}
-            <span className="tf-center" />
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
+// NOVO: componentes e hooks separados
+import PetalsCanvas from './story/PetalsCanvas.jsx';
+import TreesFlowers from './story/TreesFlowers.jsx';
+import BeeField from './story/BeeField.jsx';
+import { useInViewIO } from './story/useInViewIO.js';
+import { useNoPetalsIO } from './story/useNoPetalsIO.js';
+import { useStoryActiveClasses } from './story/useStoryActiveClasses.js';
 
 const Story = () => {
   // Ativa overrides globais somente nesta página
-  useEffect(() => {
-    document.documentElement.classList.add('story-active');
-    document.body.classList.add('story-active');
-    return () => {
-      document.documentElement.classList.remove('story-active');
-      document.body.classList.remove('story-active');
-    };
-  }, []);
+  useStoryActiveClasses();
 
-  useEffect(() => {
-    // animação suave ao entrar na viewport
-    const els = document.querySelectorAll('.story-section .section-content');
-    const io = new IntersectionObserver(
-      (entries) => entries.forEach(e => e.isIntersecting && e.target.classList.add('in-view')),
-      { threshold: 0.35 }
-    );
-    els.forEach(el => io.observe(el));
-    return () => io.disconnect();
-  }, []);
+  // animação suave ao entrar na viewport
+  useInViewIO();
+
+  // esconde pétalas enquanto #polen e/ou #trees estiverem visíveis
+  useNoPetalsIO();
 
   function scrollToNext() {
     const el = document.getElementById('about');
@@ -322,7 +60,20 @@ const Story = () => {
         </div>
       </section>
 
-      {/* NOVO: sessão 3 com flores animadas */}
+      <section id="polen" className="about story-section" aria-label="Florecendo Ideias — Sobre">
+        <div className="section-content">
+          <div className="hero-overlay">
+            <h1 className="hero-title">Abelhas</h1>
+            <p className="hero-sub">Voce sabiaa as que as plantas são a base para a vida da Terra?</p>
+            <p className="hero-sub">Em meio as petalas que voam pelo vento, que cobrem o chão no verão, que dão a belaza da primavera, essas plantas gurdam segredos e habilidade unicas.</p>
+            <p className="hero-sub">Elas são quimica, fisica, biologia e vida.</p>
+            <p className="hero-sub">Polinizadores</p>
+          </div>
+        </div>
+        {/* campo interativo de abelhas/pólen */}
+        <BeeField />
+      </section>
+
       <section id="trees" className="trees story-section" aria-label="Galhos e flores">
         <div className="section-content">
           <div className="hero-overlay">
@@ -331,6 +82,7 @@ const Story = () => {
           </div>
         </div>
         <TreesFlowers count={16} />
+        <BeeField />
       </section>
     </>
   );

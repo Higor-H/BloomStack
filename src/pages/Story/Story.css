@@ -351,7 +351,73 @@ body.story-active #root {
   50%     { transform: rotate(calc(var(--sway, 0) * var(--amp, 1) * -1deg)); }
 }
 
-/* Partículas de pólen (geradas via JS) */
+/* Seção do pólen/abelhas */
+#polen { position: relative; cursor: none; }
+#polen .section-content { z-index: 2; }
+
+/* Campo onde ficam abelha, pólen e rastro */
+.bee-field {
+  position: absolute; inset: 0;
+  overflow: hidden;
+  z-index: 5;                 /* fica acima do .section-content (z:2) */
+  pointer-events: none;       /* não bloqueia cliques/seleção no texto */
+}
+
+/* Abelha */
+.bee {
+  position: absolute;
+  transform: translate(-9999px, -9999px);
+  width: 30px; height: 20px;
+  transform-origin: center;
+  filter: drop-shadow(0 4px 10px rgba(0,0,0,.25));
+  pointer-events: none;
+  will-change: transform; /* NOVO: melhora a resposta do movimento */
+}
+.bee__body {
+  position: absolute; inset: 0;
+  border-radius: 12px 12px 10px 12px / 12px 12px 10px 12px;
+  background:
+    radial-gradient(circle at 70% 50%, rgba(255,255,255,.6), transparent 55%),
+    repeating-linear-gradient(90deg, #fbd34a 0 8px, #1f2937 8px 12px, #fbd34a 12px 20px);
+  box-shadow: inset 0 -2px 0 rgba(0,0,0,.2);
+}
+.bee__wing {
+  position: absolute; top: -6px;
+  width: 16px; height: 12px;
+  background:
+    radial-gradient(circle at 40% 40%, rgba(255,255,255,.9), rgba(255,255,255,.65));
+  border-radius: 12px 12px 10px 10px;
+  filter: drop-shadow(0 2px 2px rgba(0,0,0,.12));
+  opacity: .9;
+  transform-origin: bottom center;
+  animation: wing 220ms ease-in-out infinite alternate;
+}
+.bee__wing--l { left: 2px; transform: rotate(-12deg); }
+.bee__wing--r { right: 2px; transform: rotate(12deg); animation-delay: 60ms; }
+
+@keyframes wing {
+  0% { transform: rotate(12deg) scale(1); }
+  100% { transform: rotate(-6deg) scale(.92); }
+}
+
+/* Pólen flutuando (livre ou grudado) */
+.pollen {
+  position: absolute;
+  width: 7px; height: 7px;
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at 35% 35%, #fff7b3 0 40%, #f2c94c 60%, #d9a61a 100%);
+  box-shadow: 0 0 6px rgba(210, 180, 20, .5);
+  opacity: .9;
+  will-change: transform;
+  pointer-events: none;
+}
+.pollen.stuck {
+  box-shadow: 0 0 8px rgba(210, 180, 20, .7);
+  opacity: 1;
+}
+
+/* Partículas de pólen emitidas pelas flores */
 .tf-pollen {
   position: absolute;
   left: 50%;
@@ -372,5 +438,5 @@ body.story-active #root {
 @keyframes tf-pollen-fly {
   0%   { opacity: 0; transform: translate(-50%, -50%) scale(var(--ps, .8)); }
   15%  { opacity: .9; }
-  100% { opacity: 0; transform: translate(calc(-50% + var(--tx, 0px)), calc(-50% + var(--ty, -40px))) scale(.4); }
+  100% { opacity: 0; transform: translate(calc(-50% + var(--tx, 0px)), calc(-50% + var(--ty, -40px))) scale(.5); }
 }

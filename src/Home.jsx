@@ -31,7 +31,10 @@ function Home() {
         </div>
       <div className="glass-card">
           <div>
+            <Link to="/story">
                   <img src={BloomImage} className="logo" alt="Bloom logo" />
+            </Link>
+                 
           </div>
           <div className="card">
               <Link to="/maps">
