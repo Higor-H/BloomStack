@@ -3,8 +3,12 @@ import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import './Map.css'
 import Camera from '../Camera/Camera.jsx'
-import { initPlantId, classifyImage } from '../../services/AI.js'
-
+import { initPlantId, classifyImage } from '../../services/plantRecognition.js'
+import {
+  initImageNetGate,
+  classifyImageNet,
+  isPlantLike
+} from '../../services/isPlant.js'
 
 // IMPORTS NOVOS: camadas do mapa (OSM/GIBS/overlays) e datas GIBS
 import {
@@ -84,6 +88,7 @@ export default function MapPage() {
     (async () => {
       try {
         await initPlantId()
+        await initImageNetGate() 
       } catch (e) {
         console.error('Falha ao inicializar PlantID:', e)
       }
@@ -92,34 +97,53 @@ export default function MapPage() {
 
 
   useEffect(() => {
-    if (!captureOpen || !photoDataUrl) {
-      setPlantPred(null)
-      setPlantPredLoading(false)
-      return
-    }
-    // aguarda a imagem do modal carregar e então classifica
-    const imgEl = document.getElementById('imgPlant')
-    if (!imgEl) return
-    if (imgEl.complete) {
-      classifyNow()
-    } else {
-      imgEl.onload = () => classifyNow()
-      imgEl.onerror = () => setPlantPredLoading(false)
-    }
+  if (!captureOpen || !photoDataUrl) {
+    setPlantPred(null)
+    setPlantPredLoading(false)
+    return
+  }
+  const imgEl = document.getElementById('imgPlant')
+  if (!imgEl) return
 
-    async function classifyNow() {
-      try {
-        setPlantPredLoading(true)
-        const res = await classifyImage(imgEl, 3) // top-3 internamente, exibimos top-1
-        setPlantPred(res)
-      } catch (e) {
-        console.error('Erro na classificação:', e)
-        setPlantPred(null)
-      } finally {
-        setPlantPredLoading(false)
+  const run = async () => {
+    try {
+      setPlantPredLoading(true)
+      if (!imgEl.complete || imgEl.naturalWidth === 0) {
+        try { await imgEl.decode?.() } catch {}
       }
+      if (imgEl.naturalWidth === 0) throw new Error('Imagem não decodificada')
+
+      // 1) GATE: ImageNet (fecha modal se não parecer planta)
+      const gatePred = await classifyImageNet(imgEl, 5)
+      const decision = isPlantLike(gatePred, {
+        minProbAny: 0.01,   // ajuste fino aqui
+        minProbTop: 0.02,
+      })
+      if (!decision.ok) {
+        alert('A imagem não parece ser uma planta. Tente outra foto com a planta ocupando mais da cena.')
+        cancelCapture()
+        return
+      }
+
+      // 2) Se passou no gate, classifique a espécie (seu modelo plants-v1)
+      const res = await classifyImage(imgEl, 5)
+      setPlantPred(res)
+    } catch (e) {
+      console.error('Erro ao classificar:', e)
+      setPlantPred(null)
+    } finally {
+      setPlantPredLoading(false)
     }
-  }, [captureOpen, photoDataUrl])
+  }
+
+  if (imgEl.complete) run()
+  else {
+    imgEl.onload = () => run()
+    imgEl.onerror = () => setPlantPredLoading(false)
+  }
+
+  return () => { if (imgEl) { imgEl.onload = null; imgEl.onerror = null } }
+}, [captureOpen, photoDataUrl])
 
   useEffect(() => {
     const onResize = () => setIsNarrow(window.innerWidth < 768) // < 768px = mobile/tablet pequeno

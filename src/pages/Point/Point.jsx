@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { initPlantId, classifyImage } from '../../services/AI.js'
+import { initPlantId, classifyImage } from '../../services/plantRecognition.js'
 
 // Utils de storage (iguais aos usados no Map.jsx)
 const STORE_PREFIX = 'bloomstack.points/'
