@@ -34,12 +34,17 @@
   color: #888;
 }
 
-body.home-body {
-    background: url("/src/assets/Floresta2.jpg") no-repeat center center fixed;
-    background-size: cover; /* cobre toda a tela */
+body {
+    background: url("./assets/Floresta2.jpg") no-repeat center center fixed;
+    background-size: cover;
     font-family: sans-serif;
     height: 100%;
     width: 100%;
+    margin: 0;
+}
+
+/* apenas quando estiver na Home */
+body.home-body {
     overflow: hidden;
 }
 

@@ -8,14 +8,12 @@ import { useEffect } from "react";
 function Home() {
 
     useEffect(() => {
-        // adiciona classe no body
         document.body.classList.add("home-body");
-
-        // remove quando sair da Home
         return () => {
             document.body.classList.remove("home-body");
         };
     }, []);
+
 
   return (
     <>
