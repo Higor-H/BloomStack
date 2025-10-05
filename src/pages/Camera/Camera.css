@@ -1,1 +1,87 @@
-/* ...existing code... */
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.80); /* quase preto sólido */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    pointer-events: all;
+}
+
+.modal {
+    background: #1f1b2e; /* roxo escuro sólido */
+    border-radius: 12px;
+    padding: 16px;
+    max-width: 500px;
+    width: 100%;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+    z-index: 10000; /* acima do overlay */
+    pointer-events: auto;
+}
+
+.modal__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modal__body {
+    display: grid;
+    gap: 8px;
+}
+
+.modal__video {
+    position: relative;
+    background: #000;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.modal__video video {
+    width: 100%;
+    height: auto;
+    display: block;
+}
+
+.modal__error {
+    color: #ef4444;
+    font-size: 0.9em;
+}
+
+.modal__actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+}
+
+.modal__btn {
+    border-radius: 8px;
+    border: none;
+    padding: 0.6em 1.2em;
+    font-size: 0.9em;
+    font-weight: 600;
+    cursor: pointer;
+    background: #333;
+    color: #fff;
+    transition: background 0.2s ease;
+}
+
+.modal__btn:hover {
+    background: #444;
+}
+
+.modal__btn--ok {
+    background: #4caf50;
+    color: #fff;
+}
+
+.modal__btn--ok:hover {
+    background: #43a047;
+}
+
+video.mirror {
+    transform: scaleX(-1);
+}
+
+
