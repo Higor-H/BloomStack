@@ -84,6 +84,17 @@ export default function MapPage() {
   const [loadingVeg, setLoadingVeg] = useState(false)
   const [vegInfo, setVegInfo] = useState(null)
 
+  // Popup “imagem não é planta”
+  const [gateOpen, setGateOpen] = useState(false);
+  const [gateMsg, setGateMsg] = useState('');
+  const [gateBypass, setGateBypass] = useState(false);
+
+  useEffect(() => {
+    if (captureOpen && photoDataUrl) {
+      setGateBypass(false);
+    }
+  }, [captureOpen, photoDataUrl]);
+
   useEffect(() => {
     (async () => {
       try {
@@ -107,34 +118,36 @@ export default function MapPage() {
 
   const run = async () => {
     try {
-      setPlantPredLoading(true)
+      setPlantPredLoading(true);
       if (!imgEl.complete || imgEl.naturalWidth === 0) {
-        try { await imgEl.decode?.() } catch {}
+        try { await imgEl.decode?.(); } catch {}
       }
-      if (imgEl.naturalWidth === 0) throw new Error('Imagem não decodificada')
+      if (imgEl.naturalWidth === 0) throw new Error('Imagem não decodificada');
 
-      // 1) GATE: ImageNet (fecha modal se não parecer planta)
-      const gatePred = await classifyImageNet(imgEl, 5)
+      // 1) GATE: ImageNet — só bloqueia se reprovar E não houver bypass
+      const gatePred = await classifyImageNet(imgEl, 5);
       const decision = isPlantLike(gatePred, {
-        minProbAny: 0.01,   // ajuste fino aqui
+        minProbAny: 0.01,  // ajuste fino
         minProbTop: 0.02,
-      })
-      if (!decision.ok) {
-        alert('A imagem não parece ser uma planta. Tente outra foto com a planta ocupando mais da cena.')
-        cancelCapture()
-        return
+      });
+
+      if (!decision.ok && !gateBypass) {
+        setGateMsg('A imagem não parece ser uma planta. Você pode sair ou continuar mesmo assim.');
+        setGateOpen(true);
+        // Não fecha a captura, apenas mostra o popup e aguarda ação do usuário
+        return;
       }
 
-      // 2) Se passou no gate, classifique a espécie (seu modelo plants-v1)
-      const res = await classifyImage(imgEl, 5)
-      setPlantPred(res)
+      // 2) Se passou no gate (ou usuário optou por continuar), classifique a espécie
+      const res = await classifyImage(imgEl, 5);
+      setPlantPred(res);
     } catch (e) {
-      console.error('Erro ao classificar:', e)
-      setPlantPred(null)
+      console.error('Erro ao classificar:', e);
+      setPlantPred(null);
     } finally {
-      setPlantPredLoading(false)
+      setPlantPredLoading(false);
     }
-  }
+  };
 
   if (imgEl.complete) run()
   else {
@@ -143,7 +156,7 @@ export default function MapPage() {
   }
 
   return () => { if (imgEl) { imgEl.onload = null; imgEl.onerror = null } }
-}, [captureOpen, photoDataUrl])
+}, [captureOpen, photoDataUrl, gateBypass])
 
   useEffect(() => {
     const onResize = () => setIsNarrow(window.innerWidth < 768) // < 768px = mobile/tablet pequeno
@@ -649,7 +662,16 @@ export default function MapPage() {
     removePoint(id)
     refreshPoints({ pan: false })
   }
+  function handleGateExit() {
+    setGateOpen(false);
+    setGateBypass(false);
+    cancelCapture(); // fecha a modal de captura e limpa estados
+  }
 
+  function handleGateContinue() {
+    setGateOpen(false);
+    setGateBypass(true); // permite continuar; o efeito acima roda de novo e classifica
+  }
 
 
 
@@ -1224,6 +1246,49 @@ export default function MapPage() {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+     {gateOpen && (
+        <div
+          className="modal-overlay isplant-overlay"
+          onClick={(e) => {
+            // clique fora da caixa só fecha o aviso (sem bypass)
+            if (e.target === e.currentTarget) setGateOpen(false);
+          }}
+        >
+          <div
+            className="modal isplant-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Imagem não reconhecida como planta"
+          >
+            <div className="modal__header isplant-modal__header">
+              <div className="isplant-header-left">
+                <div aria-hidden="true" className="isplant-icon">🌱</div>
+                <strong>Não parece uma planta</strong>
+              </div>
+              {/* botão de fechar removido */}
+            </div>
+
+            <div className="isplant-modal__content">
+              <p className="isplant-text">{gateMsg}</p>
+
+              <ul className="isplant-tips">
+                <li>Preencha o quadro com a planta (evite fundo dominante).</li>
+                <li>Prefira boa iluminação e foco nas folhas/flores.</li>
+                <li>Evite pessoas/animais/objetos ocupando a maior área.</li>
+              </ul>
+
+              <div className="isplant-actions">
+                <button className="modal__btn" onClick={handleGateExit}>
+                  Sair
+                </button>
+                <button className="modal__btn modal__btn--ok" onClick={handleGateContinue}>
+                  Continuar assim mesmo
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
