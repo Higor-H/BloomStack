@@ -89,6 +89,7 @@ Pull requests are welcome! For major changes, please open an issue first to disc
 ## Authors
 - [Higor-H](https://github.com/Higor-H)
 - [Eduardo Zorzan](https://github.com/eduardozorzan)
+- [MariaChehade](https://github.com/MariaChehade)
 
 ---
 
