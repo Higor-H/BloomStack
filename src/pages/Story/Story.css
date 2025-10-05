@@ -130,6 +130,13 @@ body.story-active #root {
   z-index: 1; /* acima do fundo das seções */
 }
 
+/* Oculta as pétalas (canvas) quando a sessão 3 está visível */
+.story-no-petals .story-canvas--fixed {
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity .35s ease;
+}
+
 /* Conteúdo das sessões com transição suave */
 .story-section .section-content {
   opacity: 0;
@@ -212,4 +219,131 @@ body.story-active #root {
   background: linear-gradient(180deg, rgba(26,26,26,0.9), rgba(26,26,26,0));
   pointer-events: none;
   z-index: 0;
+}
+
+/* Sessão 3: fundo e layout */
+.trees {
+  position: relative;
+  min-height: 100svh;
+  width: 100vw;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(1100px 45% at 50% 120%, rgba(244, 114, 182, .10), transparent 60%),
+    #0b1020;
+  z-index: 0;
+}
+
+/* Jardim de flores da sessão 3 */
+.trees-flowers {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 60vh;
+  pointer-events: none;
+  z-index: 1;
+}
+.tree-flower {
+  position: absolute;
+  bottom: 0;
+  transform-origin: bottom center;
+  animation: tf-sway 5.5s ease-in-out calc(var(--d, 0s)) infinite;
+}
+
+/* Haste */
+.tf-stem {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 2px;
+  height: var(--h);
+  background: linear-gradient(180deg, #1f8a50, #2aa665);
+  border-radius: 999px;
+  transform: translateX(-50%) scaleY(0);
+}
+.trees-flowers.in .tf-stem {
+  animation: tf-stem-grow 1s cubic-bezier(.2,.8,.2,1) var(--d, 0s) forwards;
+}
+
+/* Folhas */
+.tf-leaf {
+  position: absolute;
+  bottom: calc(var(--h) * 0.38);
+  width: 26px; height: 10px;
+  background: linear-gradient(180deg, #78d595, #3aa868);
+  border-radius: 100% 0 100% 0 / 100% 0 100% 0;
+  opacity: 0; transform: scale(.6);
+  filter: drop-shadow(0 2px 2px rgba(0,0,0,.12));
+}
+.tf-leaf--l { left: calc(50% - 22px); transform-origin: right center; rotate: -18deg; }
+.tf-leaf--r { left: calc(50% - 6px);  transform-origin: left center;  rotate: 198deg; }
+.trees-flowers.in .tf-leaf {
+  animation: tf-leaf-in .7s ease calc(var(--d, 0s) + .45s) forwards;
+}
+
+/* Cabeça: 12 pétalas + miolo */
+.tf-bloom {
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--h) + 3px);
+  transform: translateX(-50%);
+}
+.tf-petal, .tf-center { position: absolute; left: 50%; top: 50%; }
+
+/* Pétalas agora exatamente centradas no miolo (base no centro) */
+.tf-petal {
+  width: 12px; height: 22px;
+  transform-origin: bottom center;
+  /* antes: translate(-50%, -50%) rotate(...) scale(0) */
+  transform: translate(-50%, -100%) rotate(calc(var(--i) * 30deg)) scale(0);
+  border-radius: 50% 50% 40% 40% / 70% 70% 40% 40%;
+  background:
+    radial-gradient(circle at 40% 30%, rgba(255,255,255,.55), transparent 55%),
+    linear-gradient(180deg, hsl(var(--hue, 330) 80% 88%), hsl(calc(var(--hue, 330) + 10) 70% 68%));
+  box-shadow: 0 0 0.5px rgba(0,0,0,.15);
+  opacity: 0;
+  z-index: 1;
+}
+.tf-center {
+  width: 10px; height: 10px;
+  transform: translate(-50%, -50%) scale(0);
+  background: radial-gradient(circle at 35% 35%, #fff9b8, #f2c94c 60%, #d9a61a 100%);
+  border-radius: 999px;
+  box-shadow: 0 1px 2px rgba(0,0,0,.18) inset;
+  opacity: 0;
+  z-index: 2; /* garante que o miolo fica por cima das pétalas */
+}
+
+/* Disparo das animações */
+.trees-flowers.in .tf-petal {
+  /* ajusta a base dos keyframes para a nova transformação */
+  animation: tf-petal-bloom .5s ease-out calc(var(--d, 0s) + .6s + (var(--i) * 0.02s)) forwards;
+}
+.trees-flowers.in .tf-center {
+  animation: tf-center-in .45s ease-out calc(var(--d, 0s) + .92s) forwards;
+}
+
+/* Keyframes */
+@keyframes tf-stem-grow {
+  from { transform: translateX(-50%) scaleY(0); }
+  to   { transform: translateX(-50%) scaleY(1); }
+}
+@keyframes tf-leaf-in {
+  0%   { opacity: 0; transform: scale(.6); }
+  70%  { opacity: 1; transform: scale(1.05); }
+  100% { opacity: 1; transform: scale(1); }
+}
+@keyframes tf-petal-bloom {
+  0%   { transform: translate(-50%, -100%) rotate(calc(var(--i) * 30deg)) scale(0); opacity: 0; }
+  60%  { transform: translate(-50%, -100%) rotate(calc(var(--i) * 30deg)) scale(1.06); opacity: 1; }
+  100% { transform: translate(-50%, -100%) rotate(calc(var(--i) * 30deg)) scale(1); opacity: 1; }
+}
+@keyframes tf-center-in {
+  0%   { transform: translate(-50%, -50%) scale(0); opacity: 0; }
+  60%  { transform: translate(-50%, -50%) scale(1.06); opacity: 1; }
+  100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+}
+@keyframes tf-sway {
+  0%,100% { transform: rotate(calc(var(--sway, 0) * 1deg)); }
+  50%     { transform: rotate(calc(var(--sway, 0) * -1deg)); }
 }

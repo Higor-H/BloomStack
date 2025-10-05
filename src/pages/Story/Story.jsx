@@ -136,6 +136,72 @@ function PetalsCanvas() {
   return <canvas ref={canvasRef} className="story-canvas story-canvas--fixed" />;
 }
 
+// NOVO: flores animadas para a sessão 3
+function TreesFlowers({ count = 12 }) {
+  const wrapRef = useRef(null);
+
+  useEffect(() => {
+    const html = document.documentElement;
+    const section = document.getElementById('trees');
+    if (!section) return;
+
+    // habilita animações das flores e oculta pétalas na sessão 3
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        if (wrapRef.current) {
+          if (entry.isIntersecting) wrapRef.current.classList.add('in');
+          else wrapRef.current.classList.remove('in');
+        }
+        if (entry.isIntersecting) html.classList.add('story-no-petals');
+        else html.classList.remove('story-no-petals');
+      },
+      { threshold: 0.35 }
+    );
+    io.observe(section);
+    return () => {
+      html.classList.remove('story-no-petals');
+      io.disconnect();
+    };
+  }, []);
+
+  const items = Array.from({ length: count }).map((_, i) => {
+    const left = 6 + Math.random() * 88; // %
+    const h = 110 + Math.random() * 120; // px
+    const delay = 0.08 * i + Math.random() * 0.15;
+    const hue = 315 + Math.floor(Math.random() * 30); // rosas/lilás
+    const sway = (Math.random() * 2 - 1).toFixed(2);  // variação no balanço
+    return { left, h, delay, hue, sway };
+  });
+
+  return (
+    <div ref={wrapRef} className="trees-flowers" aria-hidden="true">
+      {items.map((f, idx) => (
+        <div
+          key={idx}
+          className="tree-flower"
+          style={{
+            left: `${f.left}%`,
+            ['--h']: `${f.h}px`,
+            ['--d']: `${f.delay}s`,
+            ['--hue']: f.hue,
+            ['--sway']: f.sway
+          }}
+        >
+          <div className="tf-stem" />
+          <div className="tf-leaf tf-leaf--l" />
+          <div className="tf-leaf tf-leaf--r" />
+          <div className="tf-bloom">
+            {Array.from({ length: 12 }).map((__, i) => (
+              <span key={i} className="tf-petal" style={{ ['--i']: i }} />
+            ))}
+            <span className="tf-center" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 const Story = () => {
   // Ativa overrides globais somente nesta página
   useEffect(() => {
@@ -197,6 +263,17 @@ const Story = () => {
             <p className="hero-sub">E muito mais...</p>
           </div>
         </div>
+      </section>
+
+      {/* NOVO: sessão 3 com flores animadas */}
+      <section id="trees" className="trees story-section" aria-label="Galhos e flores">
+        <div className="section-content">
+          <div className="hero-overlay">
+            <h1 className="hero-title">Galhos em Flor</h1>
+            <p className="hero-sub">Florescendo ao fundo para continuar a história.</p>
+          </div>
+        </div>
+        <TreesFlowers count={16} />
       </section>
     </>
   );
