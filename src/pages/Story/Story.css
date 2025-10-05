@@ -1,0 +1,183 @@
+/* Story.css */
+
+body {
+    margin: 0;
+    font-family: 'Arial', sans-serif;
+    background-color: #f4f4f9;
+    color: #333;
+}
+
+.story-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.story-header {
+    text-align: center;
+    margin-bottom: 40px;
+}
+
+.story-header h1 {
+    font-size: 2.5rem;
+    color: #2c3e50;
+}
+
+.story-header p {
+    font-size: 1.2rem;
+    color: #7f8c8d;
+}
+
+.story-content {
+    line-height: 1.6;
+    font-size: 1rem;
+}
+
+.story-content p {
+    margin-bottom: 20px;
+}
+
+.story-image {
+    width: 100%;
+    max-width: 800px;
+    margin: 20px auto;
+    display: block;
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.story-footer {
+    text-align: center;
+    margin-top: 40px;
+}
+
+.story-footer a {
+    text-decoration: none;
+    color: #3498db;
+    font-weight: bold;
+}
+
+.story-footer a:hover {
+    color: #2980b9;
+}
+
+/* Hero em tela cheia com pétalas caindo */
+.story-hero {
+  position: relative;     /* volta a ser relativa */
+  top: auto;
+  inset: 0;
+  height: 100svh;
+  width: 100vw;
+  z-index: 1;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background-color: #1a1a1a;
+}
+
+/* OVERRIDES: apenas quando a página Story está ativa */
+html.story-active, body.story-active {
+  overflow: auto !important;
+  height: auto;
+  min-height: 100svh;
+  display: block !important;           /* anula body { display:flex } global */
+  place-items: initial !important;      /* anula place-items:center global */
+  scroll-behavior: smooth;              /* rolagem suave */
+  background: #1a1a1a;                  /* fundo coerente com o hero */
+  color: #e2e8f0;
+}
+body.story-active {
+  /* anula background/overflow da Home.css */
+  background: #1a1a1a !important;
+  overflow: auto !important;
+}
+body.story-active #root {
+  max-width: none;
+  padding: 0;
+  min-height: 100svh;
+  display: block;
+  text-align: initial;
+  align-items: normal;
+  justify-content: normal;
+  color: inherit;
+  text-shadow: none;
+}
+
+.about {
+  position: relative;
+  min-height: 100svh;
+  width: 100vw;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  /* leve variação no fundo para distinguir a seção */
+  background:
+    radial-gradient(1200px 40% at 50% 120%, rgba(244, 114, 182, .12), transparent 60%),
+    #0f172a;
+}
+
+.story-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+/* Animação do título/subtítulo */
+@keyframes titleIn {
+  0%   { opacity: 0; transform: translateY(18px) scale(0.98); filter: blur(3px); }
+  60%  { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+  100% { opacity: 1; transform: none; filter: none; }
+}
+
+.hero-title {
+  margin: 0;
+  font-size: clamp(36px, 6vw, 72px);
+  line-height: 1.05;
+  background: linear-gradient(135deg, #ffffff, #ffe4f1 45%, #e9d5ff);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow: 0 4px 40px rgba(255,255,255,0.1);
+  animation: titleIn 800ms ease-out both;
+}
+
+.hero-sub {
+  margin: 0;
+  color: #cbd5e1;
+  font-size: clamp(14px, 2.5vw, 18px);
+  opacity: .9;
+  animation: titleIn 900ms 120ms ease-out both;
+}
+
+/* Indicador de scroll (para próxima seção) */
+.scroll-indicator {
+  position: absolute;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.16);
+  color: #e2e8f0;
+  font-size: 12px;
+  cursor: pointer;
+  user-select: none;
+  backdrop-filter: blur(6px);
+  animation: bounce 1.8s ease-in-out infinite;
+}
+.scroll-indicator__arrow {
+  width: 10px; height: 10px;
+  border-right: 2px solid #e2e8f0;
+  border-bottom: 2px solid #e2e8f0;
+  transform: rotate(45deg);
+}
+@keyframes bounce {
+  0%, 100% { transform: translateX(-50%) translateY(0); }
+  50% { transform: translateX(-50%) translateY(4px); }
+}
