@@ -92,6 +92,11 @@ export default function MapPage() {
   const [photoExifCoord, setPhotoExifCoord] = useState(null)
   const [descDraft, setDescDraft] = useState('')
   const [titleDraft, setTitleDraft] = useState('')
+  const [sciNameDraft, setSciNameDraft] = useState('')
+  const [sciProbDraft, setSciProbDraft] = useState(null)
+  const [sciSuggestedName, setSciSuggestedName] = useState('');
+  const [sciSuggestedProb, setSciSuggestedProb] = useState(null);
+
 
   const [cameraOpen, setCameraOpen] = useState(false)
   const [isNarrow, setIsNarrow] = useState(false)
@@ -157,7 +162,22 @@ export default function MapPage() {
 
       // 2) Se passou no gate (ou usuário optou por continuar), classifique a espécie
       const res = await classifyImage(imgEl, 5);
+      
+      // normalização: trate "Nenhum nome científico encontrado" como vazio
+      const rawLabel = (res?.label || '').trim();
+      const noneLike = /nenhum nome científico encontrado/i.test(rawLabel);
+      const suggested = noneLike ? '' : rawLabel;
+      const prob = Number.isFinite(res?.prob) ? res.prob : null;
+
       setPlantPred(res);
+
+      // fixa a SUGESTÃO da IA (não muda com digitação)
+      setSciSuggestedName(suggested);
+      setSciSuggestedProb(prob);
+
+      // inicializa o campo editável com a sugestão (ou vazio)
+      setSciNameDraft(suggested);
+      setSciProbDraft(prob);
     } catch (e) {
       console.error('Erro ao classificar:', e);
       setPlantPred(null);
@@ -250,6 +270,10 @@ export default function MapPage() {
         setPendingCoord(exifCoord) // sincroniza para exibir na UI do modal
       }
     }
+    setSciSuggestedName('');
+    setSciSuggestedProb(null);
+    setSciNameDraft('');
+    setSciProbDraft(null);
     setCaptureOpen(true)
   }
 
@@ -354,6 +378,10 @@ export default function MapPage() {
     setDescDraft('')
     setTitleDraft('')
     setPendingCoord(null)
+     setSciSuggestedName('');
+    setSciSuggestedProb(null);
+    setSciNameDraft('');
+    setSciProbDraft(null);
     pendingCoordRef.current = null // NOVO
   }
 
@@ -362,6 +390,8 @@ export default function MapPage() {
     if (!coord) return cancelCapture()
     const label = titleDraft?.trim() || '(sem título)'
     const description = descDraft?.trim() || ''
+    const scientificName = (sciNameDraft || '').trim()
+
     let envSnap = null
     try {
       envSnap = await fetchEnvInfo(coord.lat, coord.lng)
@@ -375,7 +405,8 @@ export default function MapPage() {
       photoUrl: photoDataUrl,
       // NOVO: snapshot do momento da foto
       capturedAt: envSnap?.at || new Date().toISOString(),
-      captureEnv: envSnap
+      captureEnv: envSnap,
+      scientificName
     })
     setCaptureOpen(false)
     setPhotoDataUrl(''); setPhotoExifCoord(null); setDescDraft(''); setTitleDraft('')
@@ -851,23 +882,39 @@ export default function MapPage() {
 
               {photoDataUrl && (
                 <>
-                <img id='imgPlant' src={photoDataUrl} alt="Photo preview" style={{ width: '100%', borderRadius: 8, border: '1px solid #e5e7eb' }} />
-                <div style={{ marginTop: 8 }}>
-                  {plantPredLoading && (
-                    <div style={{ color: '#64748b' }}>Identifying species…</div>
-                  )}
-                  {!plantPredLoading && plantPred && (
-                    <div>
-                      <div style={{ fontWeight: 600 }}>Likely species (scientific name)</div>
-                      <div style={{ marginTop: 4 }}>
-                        {plantPred.label} <span style={{ color: '#64748b' }}>({(plantPred.prob * 100).toFixed(1)}%)</span>
-                      </div>
-                    </div>
-                  )}
-                  {!plantPredLoading && !plantPred && (
-                    <div style={{ color: '#94a3b8' }}>Waiting for processing…</div>
-                  )}
-                </div>
+                <img id='imgPlant' src={photoDataUrl} alt="Pré-visualização da foto" style={{ width: '100%', borderRadius: 8, border: '1px solid #e5e7eb' }} />
+               {!plantPredLoading && (
+                        <label style={{ display: 'grid', gap: 6, marginTop: 8 }}>
+                          <span>Nome Científico</span>
+
+                          {/* badges */}
+                          {(() => {
+                            const hasSuggestion = !!sciSuggestedName?.trim();
+                            if (hasSuggestion && Number.isFinite(sciSuggestedProb)) {
+                              return (
+                                <span className="modal__btn--ok badge_suggestion">
+                                  Encontrado nome científico provável ({(sciSuggestedProb * 100).toFixed(1)}%)
+                                </span>
+                              );
+                            }
+                            return (
+                              <span className="modal__btn--warn badge_suggestion">
+                                Nenhuma sugestão encontrada
+                              </span>
+                            );
+                          })()}
+
+                          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                            <input
+                              type="text"
+                              placeholder="Ex.: Handroanthus albus"
+                              value={sciNameDraft === 'Nenhum nome científico encontrado' ? '' : sciNameDraft}
+                              onChange={(e) => setSciNameDraft(e.target.value)}
+                              style={{ flex: 1, padding: 8, borderRadius: 8, border: '1px solid #e5e7eb' }}
+                            />
+                          </div>
+                        </label>
+                      )}
                 </>
               )}
 
