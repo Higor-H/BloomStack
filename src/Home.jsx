@@ -49,12 +49,9 @@ function Home() {
               <Link to="/feed" style={{ marginLeft: 8 }}>
                   <button>Ver feed</button>
               </Link>
-              <p>
-                  Edit <code>src/Home.jsx</code> and save to test HMR
-              </p>
           </div>
           <p className="read-the-docs">
-              Click on the Vite and React logos to learn more
+              By Ana Silva, Eduardo Zorzan, Gabriela Superti, Higor Milani, Lauro Ferneda, Maria Chehade
           </p>
       </div>
     </>
