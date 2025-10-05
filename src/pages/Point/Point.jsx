@@ -44,7 +44,6 @@ export default function PointPage() {
   const all = useMemo(loadPointsFromStorage, [])
   const point = all.find(p => p.slug === slug)
 
-  const [photoUrl, setPhotoUrl] = useState(point?.photoUrl || '')
   const [description, setDescription] = useState(point?.description || '')
   const [distanceKm, setDistanceKm] = useState(null)
   const [scientificName, setScientificName] = useState(point?.scientificName || '');
@@ -67,7 +66,10 @@ export default function PointPage() {
 
   function saveMeta() {
     if (!point) return
-    const updated = updatePointInStorage(point.id, { photoUrl: photoUrl.trim(), description: description.trim(), scientificName: scientificName.trim() })
+    const updated = updatePointInStorage(point.id, {
+      description: description.trim(),
+      scientificName: scientificName.trim()
+    })
     if (!updated) return alert('Failed to save.')
     alert('Saved!')
   }
@@ -82,7 +84,7 @@ export default function PointPage() {
   }
 
   const title = point.label?.trim() || '(no label)'
-  const img = photoUrl || point.photoUrl || `https://placehold.co/1200x480?text=${encodeURIComponent(title)}`
+  const img = point.photoUrl || `https://placehold.co/1200x480?text=${encodeURIComponent(title)}`
   const capAt = point.capturedAt ? new Date(point.capturedAt) : null
   const capEnv = point.captureEnv || null
 
@@ -101,7 +103,7 @@ export default function PointPage() {
 
       {/* Conditions at capture time */}
       <section style={{ display: 'grid', gap: 8, padding: 12, border: '1px solid #e5e7eb', borderRadius: 12, background: '#ffffff' }}>
-        <strong>Conditions at capture time</strong>
+        <strong style={{ color: '#475569' }}>Conditions at capture time</strong>
         <div style={{ color: '#64748b', fontSize: 13 }}>
           Captured at: {capAt ? capAt.toLocaleString() : '—'}
         </div>
@@ -158,24 +160,14 @@ export default function PointPage() {
           onChange={e => setDescription(e.target.value)}
           style={{ padding: 8, borderRadius: 8, border: '1px solid #e5e7eb' }}
         />
-        <label style={{ display: 'grid', gap: 6 }}>
-          <span>Photo URL</span>
-          <input
-            type="url"
-            placeholder="https://..."
-            value={photoUrl}
-            onChange={e => setPhotoUrl(e.target.value)}
-            style={{ padding: 8, borderRadius: 8, border: '1px solid #e5e7eb' }}
-          />
-        </label>
         <button onClick={saveMeta} style={{ padding: '6px 10px', border: '1px solid #e5e7eb', borderRadius: 8, background: '#00ff22ff', width: 'fit-content' }}>
           Save
         </button>
       </section>
 
       <section style={{ color: '#475569' }}>
-        <div><strong>Coordinates:</strong> {point.lat.toFixed(6)}, {point.lng.toFixed(6)}</div>
-        <div><strong>Distance to you:</strong> {distanceKm == null ? '—' : `${distanceKm.toFixed(2)} km`}</div>
+        <div style={{ color: '#ffffffff' }} ><strong>Coordinates:</strong> {point.lat.toFixed(6)}, {point.lng.toFixed(6)}</div>
+        <div style={{ color: '#ffffffff' }}><strong >Distance to you:</strong> {distanceKm == null ? '—' : `${distanceKm.toFixed(2)} km`}</div>
       </section>
     </div>
   )
