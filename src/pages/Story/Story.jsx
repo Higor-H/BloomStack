@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import './Story.css';
 import { Link } from 'react-router-dom';
+import Player from "./Player.jsx";
 
 
 // NOVO: componentes e hooks separados
@@ -40,6 +41,8 @@ const Story = () => {
     <>
       {/* Canvas único e fixo para compartilhar pétalas entre sessões */}
       <PetalsCanvas />
+        <audio src="/assets/audio.mp3" autoPlay loop />
+        <Player />
 
       <section className="story-hero story-section" aria-label="Florecendo Ideias">
         <div className="section-content" style={{ padding: '0 16px', maxWidth: 1100, margin: '0 auto' }}>
