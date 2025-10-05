@@ -1,26 +1,101 @@
-# React + Vite
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+# FloraQuest
 
-Currently, two official plugins are available:
+FloraQuest is a modern web application for plant recognition, environmental data visualization, and interactive storytelling. Built with React and Vite, it leverages machine learning models for plant identification and provides a rich user experience with maps, charts, and camera integration.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Features
 
-## React Compiler
+- **Plant Recognition**: Identify plants using on-device ML models (TFLite) and a simple camera interface.
+- **Interactive Map**: Visualize geolocated data points and environmental layers.
+- **Charts & Data Visualization**: Explore time series and environmental data with interactive charts.
+- **Story Mode**: Engage with educational stories about nature and biodiversity.
+- **Feed**: Browse recent activity and discoveries.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Project Structure
 
-## Expanding the ESLint configuration
+```
+projeto/BloomStack/
+├── app.js
+├── index.html
+├── package.json
+├── vite.config.js
+├── src/
+│   ├── main.jsx
+│   ├── Home.jsx
+│   ├── pages/
+│   │   ├── About/
+│   │   ├── Camera/
+│   │   ├── Charts/
+│   │   ├── Feed/
+│   │   ├── Map/
+│   │   ├── Point/
+│   │   └── Story/
+│   ├── services/
+│   └── api/
+├── public/
+│   └── models/
+│       ├── isPlant/
+│       └── plantRecogntion/
+└── data/
+```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## Getting Started
 
-## Credits / Third-Party
+### Prerequisites
+- Node.js (v16 or higher recommended)
+- npm or yarn
 
-This project uses portions of code from:
+### Installation
+
+1. Clone the repository:
+	```bash
+	git clone https://github.com/Higor-H/BloomStack.git
+	cd /BloomStack
+	```
+2. Install dependencies:
+	```bash
+	npm install
+	# or
+	yarn install
+	```
+3. Start the development server:
+	```bash
+	npm run dev
+	# or
+	yarn dev
+	```
+4. Open [http://localhost:5173](http://localhost:5173) in your browser.
+
+## Usage
+- Use the navigation menu to explore features: Map, Camera, Charts, Feed, Story, and About.
+- Try the Camera page to identify plants using your device's camera.
+- Explore the Map and Charts for environmental data.
+
+## Machine Learning Models
+- TFLite models for plant recognition are located in `public/models/`.
+- Labels and model files are included for both plant detection and recognition.
+
+## Folder Overview
+- `src/pages/` — Main application pages (Map, Camera, Charts, Feed, Story, About, Point)
+- `src/services/` — Service modules for ML, map layers, and storage
+- `src/api/` — API integration
+- `public/models/` — ML models and label files
+- `data/` — Sample datasets
+
+## Contributing
+Pull requests are welcome! For major changes, please open an issue first to discuss what you would like to change.
+
+
+## Authors
+- [Higor-H](https://github.com/Higor-H)
+- [Eduardo Zorzan](https://github.com/eduardozorzan)
+
+---
 
 <Original Project> — MIT License
 Author: joergmlpts
 Repository: https://github.com/joergmlpts/nature-id?tab=MIT-1-ov-file
 
 Usage: Was used the trained model for identifying scientific names of plants.
+
+*FloraQuest: Growing knowledge, one plant at a time.*

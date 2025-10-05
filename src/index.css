@@ -43,7 +43,7 @@ button {
     font-size: 1em;
     font-weight: 600;
     font-family: inherit;
-    background: rgba(88, 52, 206, 0.783); /* roxo mais forte */
+    background: #5834cec8; /* roxo mais forte */
     backdrop-filter: blur(10px);
     color: #e1fee4; /* texto verdinho claro */
     cursor: pointer;
