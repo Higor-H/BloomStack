@@ -35,6 +35,9 @@ function Home() {
               <Link to="/maps">
                   <button>Ir para Maps</button>
               </Link>
+              <Link to="/feed" style={{ marginLeft: 8 }}>
+                  <button>Ver feed</button>
+              </Link>
               <p>
                   Edit <code>src/Home.jsx</code> and save to test HMR
               </p>

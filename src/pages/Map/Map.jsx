@@ -2,156 +2,37 @@ import { useEffect, useRef, useState } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import './Map.css'
-import Camera from '../Camera/Camera.jsx' // NOVO: componente de câmera
+import Camera from '../Camera/Camera.jsx'
 
-// "Prefixo" para simular arquivos JSON no storage (uma chave por arquivo)
-const STORE_PREFIX = 'bloomstack.points/'
-// Helpers de slug/escape
-function slugify(s = '') {
-  return String(s)
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase().trim()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/(^-|-$)/g, '')
-}
-function ensureUniqueSlug(allDocs, baseSlug, idHint) {
-  let slug = baseSlug || `p-${Date.now()}`
-  const taken = new Set(allDocs.filter(d => d.id !== idHint).map(d => d.slug))
-  let i = 1
-  while (taken.has(slug)) slug = `${baseSlug}-${i++}`
-  return slug
-}
+// IMPORTS NOVOS: camadas do mapa (OSM/GIBS/overlays) e datas GIBS
+import {
+  buildBaseLayer,
+  buildBoundariesOverlay,
+  buildNasaOverlay,
+  getGibsDate,
+  clampGibsDate,
+  GIBS_MIN_DATE,
+} from '../../services/mapLayers.js'
+
+// IMPORTS NOVOS: CRUD/Storage dos pontos
+import {
+  loadPoints,
+  savePoint,
+  clearAllPoints,
+  updatePoint,
+  removePoint,
+} from '../../services/pointsStorage.js'
+
+// IMPORTS NOVOS: APIs ambientais e util de direção do vento
+import {
+  fetchEnvInfo,
+  fetchVegetationInfo,
+  degToCompass,
+} from '../../api/envApi.js'
+
+// MANTER somente helpers de UI necessários no Map (ex.: escapeHtml)
 function escapeHtml(s = '') {
   return String(s).replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))
-}
-
-// Gera um ID simples para nome de arquivo
-function genId() {
-  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-}
-
-// Salva um ponto como JSON em uma chave separada do localStorage (agora com slug, foto e descrição)
-function savePointToStorage({ lat, lng, label, description, photoUrl }) {
-  const id = genId()
-  const all = loadPointsFromStorage()
-  const baseSlug = slugify(label) || `p-${lat.toFixed(5)}-${lng.toFixed(5)}`
-  const slug = ensureUniqueSlug(all, baseSlug, id)
-  const doc = {
-    id, slug, lat, lng,
-    label: label || '',
-    createdAt: new Date().toISOString(),
-    photoUrl: photoUrl || '',
-    description: description || ''
-  }
-  try {
-    localStorage.setItem(`${STORE_PREFIX}${id}.json`, JSON.stringify(doc))
-  } catch (e) {
-    console.warn('Falha ao salvar ponto no storage', e)
-  }
-  return doc
-}
-
-// Lista todos os pontos salvos (cada um é um JSON separado)
-function loadPointsFromStorage() {
-  const out = []
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i)
-    if (key && key.startsWith(STORE_PREFIX)) {
-      try {
-        const raw = localStorage.getItem(key)
-        const doc = raw ? JSON.parse(raw) : null
-        if (doc && typeof doc.lat === 'number' && typeof doc.lng === 'number') out.push(doc)
-      } catch { /* ignora JSON inválido */ }
-    }
-  }
-  return out.sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''))
-}
-
-// Remove todos os “arquivos” de pontos
-function clearPointsFromStorage() {
-  const toDel = []
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i)
-    if (key && key.startsWith(STORE_PREFIX)) toDel.push(key)
-  }
-  toDel.forEach((k) => localStorage.removeItem(k))
-}
-
-// NOVO: atualizar um ponto no storage (já existente no arquivo)
-function updatePointInStorage(id, patch) {
-  const key = `${STORE_PREFIX}${id}.json`
-  const raw = localStorage.getItem(key)
-  if (!raw) return null
-  try {
-    const current = JSON.parse(raw)
-    const next = { ...current, ...patch }
-    localStorage.setItem(key, JSON.stringify(next))
-    return next
-  } catch { return null }
-}
-
-// NOVO: remover um ponto específico do storage (já existente no arquivo)
-function removePointFromStorage(id) {
-  localStorage.removeItem(`${STORE_PREFIX}${id}.json`)
-}
-
-// Data para NASA GIBS (usa “ontem” para garantir disponibilidade)
-function getGibsDate() {
-  const d = new Date()
-  d.setDate(d.getDate() - 1)
-  return d.toISOString().slice(0, 10)
-}
-// Limites de data GIBS
-const GIBS_MIN_DATE = '2000-02-24'
-function clampGibsDate(str) {
-  if (!str) return getGibsDate()
-  const min = new Date(GIBS_MIN_DATE).getTime()
-  const max = new Date(getGibsDate()).getTime()
-  const t = new Date(str).getTime()
-  if (Number.isNaN(t)) return getGibsDate()
-  if (t < min) return GIBS_MIN_DATE
-  if (t > max) return getGibsDate()
-  return new Date(t).toISOString().slice(0, 10)
-}
-
-// Helpers para camadas base (OSM e NASA GIBS)
-function buildOsmLayer() {
-  return L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 19,
-    attribution: '&copy; OpenStreetMap contributors'
-  })
-}
-function buildGibsLayer(date = getGibsDate()) {
-  return L.tileLayer(
-    `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_CorrectedReflectance_TrueColor/default/${date}/GoogleMapsCompatible_Level9/{z}/{y}/{x}.jpg`,
-    { tileSize: 256, minZoom: 1, maxZoom: 9, attribution: 'Imagery © NASA GIBS/ESDIS' }
-  )
-}
-function buildBaseLayer(kind, date) {
-  return kind === 'gibs' ? buildGibsLayer(date) : buildOsmLayer()
-}
-
-// NOVO: overlays NASA GIBS voltados a blooms (Chlorophyll-a)
-function buildNasaOverlay(kind, date = getGibsDate()) {
-  if (!kind || kind === 'none') return null
-  const base = 'https://gibs.earthdata.nasa.gov/wmts/epsg3857/best'
-  const byKind = {
-    viirs_chla: `${base}/VIIRS_SNPP_Chlorophyll_A/default/${date}/GoogleMapsCompatible_Level9/{z}/{y}/{x}.png`,
-    modis_chla: `${base}/MODIS_Aqua_Chlorophyll_A/default/${date}/GoogleMapsCompatible_Level9/{z}/{y}/{x}.png`,
-  }
-  const url = byKind[kind]
-  if (!url) return null
-  return L.tileLayer(url, {
-    tileSize: 256, minZoom: 1, maxZoom: 9,
-    attribution: 'Imagery © NASA GIBS/ESDIS'
-  })
-}
-
-// Conversão graus -> ponto cardeal simples
-function degToCompass(deg) {
-  if (deg == null || Number.isNaN(deg)) return '—'
-  const dirs = ['N','NNE','NE','ENE','L','ESE','SE','SSE','S','SSO','SO','OSO','O','ONO','NO','NNO'] // L=Les(N/E), O=Oeste
-  return dirs[Math.round(((deg % 360) / 22.5)) % 16]
 }
 
 export default function MapPage() {
@@ -160,43 +41,37 @@ export default function MapPage() {
   const userLayer = useRef(null)
   const baseLayerRef = useRef(null)
   const boundariesLayerRef = useRef(null)
-  const nasaOverlayRef = useRef(null) // NOVO: overlay NASA prioritário
+  const nasaOverlayRef = useRef(null)
   const centerRef = useRef({ lat: 0, lng: 0 })
+  const initialFocusDoneRef = useRef(false) // NOVO: evita que geoloc “desfaça” o foco por slug
 
   const [lat, setLat] = useState('')
   const [lng, setLng] = useState('')
   const [label, setLabel] = useState('')
-  // NOVO: estado da lista e visibilidade do popup
   const [points, setPoints] = useState([])
   const [showList, setShowList] = useState(false)
-  const [basemap, setBasemap] = useState('gibs') // 'osm' | 'gibs'
-  const [gibsDate, setGibsDate] = useState(getGibsDate()) // nova data selecionável
-  const [showBoundaries, setShowBoundaries] = useState(true) // NOVO: controle de exibição
+  const [basemap, setBasemap] = useState('gibs')
+  const [gibsDate, setGibsDate] = useState(getGibsDate())
+  const [showBoundaries, setShowBoundaries] = useState(true)
   const [envInfo, setEnvInfo] = useState(null)
   const [loadingEnv, setLoadingEnv] = useState(false)
-  // NOVO: camada NASA (blooms)
   const [nasaLayer, setNasaLayer] = useState('viirs_chla') // 'none' | 'viirs_chla' | 'modis_chla'
 
-  // NOVO: refs e estados para captura de foto
   const cameraInputRef = useRef(null)
   const uploadInputRef = useRef(null)
-  const pendingCoordRef = useRef(null) // NOVO: fonte da verdade da coordenada selecionada
-  const [pendingCoord, setPendingCoord] = useState(null) // {lat,lng}
+  const pendingCoordRef = useRef(null)
+  const [pendingCoord, setPendingCoord] = useState(null)
   const [captureOpen, setCaptureOpen] = useState(false)
   const [photoDataUrl, setPhotoDataUrl] = useState('')
-  const [photoExifCoord, setPhotoExifCoord] = useState(null) // {lat,lng}
+  const [photoExifCoord, setPhotoExifCoord] = useState(null)
   const [descDraft, setDescDraft] = useState('')
   const [titleDraft, setTitleDraft] = useState('')
 
-  // NOVO: controle do componente de câmera
   const [cameraOpen, setCameraOpen] = useState(false)
-  // NOVO: flag de largura da tela para responsividade
   const [isNarrow, setIsNarrow] = useState(false)
-  // NOVO: minimizar/expandir painel ambiental
   const [envCollapsed, setEnvCollapsed] = useState(false)
   const ENV_COLLAPSED_KEY = 'bloomstack.ui/envPanelCollapsed'
 
-  // NOVO: estados para vegetação (OSM/Overpass)
   const [loadingVeg, setLoadingVeg] = useState(false)
   const [vegInfo, setVegInfo] = useState(null)
 
@@ -400,89 +275,39 @@ export default function MapPage() {
     pendingCoordRef.current = null // NOVO
   }
 
-  function saveCapturedPoint() {
-    const coord = pendingCoordRef.current // NOVO
+  async function saveCapturedPoint() {
+    const coord = pendingCoordRef.current
     if (!coord) return cancelCapture()
     const label = titleDraft?.trim() || '(sem título)'
     const description = descDraft?.trim() || ''
-    savePointToStorage({
+    let envSnap = null
+    try {
+      envSnap = await fetchEnvInfo(coord.lat, coord.lng)
+    } catch { envSnap = null }
+
+    savePoint({
       lat: coord.lat,
       lng: coord.lng,
       label,
       description,
-      photoUrl: photoDataUrl
+      photoUrl: photoDataUrl,
+      // NOVO: snapshot do momento da foto
+      capturedAt: envSnap?.at || new Date().toISOString(),
+      captureEnv: envSnap
     })
     setCaptureOpen(false)
     setPhotoDataUrl(''); setPhotoExifCoord(null); setDescDraft(''); setTitleDraft('')
     setPendingCoord(null)
-    pendingCoordRef.current = null // NOVO
+    pendingCoordRef.current = null
     refreshPoints({ pan: true })
   }
 
-  // Buscar dados ambientais (vento, umidade, AQ, pólen) para lat/lng
-  async function fetchEnvInfo(lat, lng) {
+  // Wrapper local para carregar condições ambientais (controla loading e estado)
+  async function loadEnv(lat, lng) {
     try {
       setLoadingEnv(true)
-      const tz = 'auto'
-
-      // Clima atual + umidade horária
-      const wUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current_weather=true&hourly=relativehumidity_2m&timezone=${tz}`
-      const [wRes] = await Promise.all([fetch(wUrl)])
-      const w = await wRes.json()
-
-      const windSpeed = w?.current_weather?.windspeed ?? null
-      const windDir = w?.current_weather?.winddirection ?? null
-
-      // Encontrar umidade na hora mais recente
-      let humidity = null
-      try {
-        const times = w?.hourly?.time || []
-        const hums = w?.hourly?.relativehumidity_2m || []
-        if (times.length && hums.length) {
-          const nowIso = new Date().toISOString().slice(0, 13) + ':00'
-          let idx = times.lastIndexOf(nowIso)
-          if (idx < 0) idx = hums.length - 1
-          humidity = hums[idx] ?? null
-        }
-      } catch {}
-
-      // Qualidade do ar (pm2.5, pm10, ozônio)
-      let aq = {}
-      try {
-        const aqUrl = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lng}&hourly=pm2_5,pm10,ozone&timezone=${tz}`
-        const aqRes = await fetch(aqUrl)
-        const aqJson = await aqRes.json()
-        const t = aqJson?.hourly?.time || []
-        const last = t.length ? t.length - 1 : -1
-        aq = {
-          pm25: last >= 0 ? aqJson?.hourly?.pm2_5?.[last] ?? null : null,
-          pm10: last >= 0 ? aqJson?.hourly?.pm10?.[last] ?? null : null,
-          o3:   last >= 0 ? aqJson?.hourly?.ozone?.[last] ?? null : null,
-        }
-      } catch { aq = {} }
-
-      // Pólen (gramíneas/árvores/ervas) – pode não estar disponível em todas regiões
-      let pollen = {}
-      try {
-        const polUrl = `https://pollen-api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&hourly=grass_pollen,tree_pollen,weed_pollen&timezone=${tz}`
-        const polRes = await fetch(polUrl)
-        const polJson = await polRes.json()
-        const t = polJson?.hourly?.time || []
-        const last = t.length ? t.length - 1 : -1
-        pollen = {
-          grass: last >= 0 ? polJson?.hourly?.grass_pollen?.[last] ?? null : null,
-          tree:  last >= 0 ? polJson?.hourly?.tree_pollen?.[last] ?? null : null,
-          weed:  last >= 0 ? polJson?.hourly?.weed_pollen?.[last] ?? null : null,
-        }
-      } catch { pollen = {} }
-
-      setEnvInfo({
-        lat: Number(lat), lng: Number(lng),
-        windSpeed, windDir, humidity,
-        pm25: aq.pm25 ?? null, pm10: aq.pm10 ?? null, o3: aq.o3 ?? null,
-        pollen,
-        at: new Date().toISOString()
-      })
+      const info = await fetchEnvInfo(lat, lng)
+      setEnvInfo(info)
     } catch (e) {
       console.warn('Falha ao obter dados ambientais', e)
       setEnvInfo(null)
@@ -491,21 +316,24 @@ export default function MapPage() {
     }
   }
 
-  // NOVO: recarrega pontos do storage e redesenha marcadores (com migração de slug)
-  function refreshPoints({ pan = false } = {}) {
-    const all = loadPointsFromStorage().map((p) => {
-      if (!p.slug) {
-        const allNoSelf = loadPointsFromStorage().filter(d => d.id !== p.id)
-        const base = p.label ? slugify(p.label) : `p-${p.lat.toFixed(5)}-${p.lng.toFixed(5)}`
-        const slug = ensureUniqueSlug(allNoSelf, base, p.id)
-        const fixed = { ...p, slug }
-        localStorage.setItem(`${STORE_PREFIX}${p.id}.json`, JSON.stringify(fixed))
-        return fixed
-      }
-      return p
-    })
+  // Wrapper local para vegetação (Overpass)
+  async function loadVeg(lat, lng, radius = 500) {
+    try {
+      setLoadingVeg(true)
+      const v = await fetchVegetationInfo(lat, lng, radius)
+      setVegInfo(v)
+    } catch (e) {
+      console.warn('Falha ao obter vegetação', e)
+      setVegInfo(null)
+    } finally {
+      setLoadingVeg(false)
+    }
+  }
 
-    setPoints?.(all) // se existir no arquivo (em versões com lista)
+  // NOVO: recarrega pontos do storage e redesenha marcadores
+  function refreshPoints({ pan = false } = {}) {
+    const all = loadPoints() // garante slug e migra se necessário
+    setPoints?.(all)
     if (!userLayer.current) return
 
     userLayer.current.clearLayers()
@@ -550,7 +378,7 @@ export default function MapPage() {
       boundariesLayerRef.current.addTo(map)
     }
 
-    // NOVO: overlay NASA de blooms (prioridade)
+    // Overlay NASA (prioritário)
     if (nasaLayer && nasaLayer !== 'none') {
       nasaOverlayRef.current = buildNasaOverlay(nasaLayer, gibsDate)
       nasaOverlayRef.current && nasaOverlayRef.current.addTo(map)
@@ -560,19 +388,55 @@ export default function MapPage() {
     centerRef.current = map.getCenter()
     map.on('moveend', () => { centerRef.current = map.getCenter() })
 
-    // NOVO: clique no mapa abre popup para adicionar ponto (câmera/upload)
+    // Clique no mapa abre popup
     const onMapClick = (evt) => {
       openAddPointPopup(evt.latlng)
     }
     map.on('click', onMapClick)
 
-    // Geolocalização do usuário (não persiste)
+    // Carrega e desenha do storage
+    refreshPoints({ pan: false })
+
+    // NOVO: focar por slug vindo da URL (?slug=...) e travar geoloc de recenter
+    try {
+      const sp = new URLSearchParams(window.location.search)
+      const qsSlug = sp.get('slug')
+      if (qsSlug) {
+        const docs = loadPoints()
+        const doc = docs.find(p => p.slug === qsSlug)
+        if (doc) {
+          const focusZoom = basemap === 'gibs' ? 9 : 15
+          map.setView([doc.lat, doc.lng], focusZoom)
+          const html = `
+            <div style="min-width:180px">
+              <div style="font-weight:600;margin-bottom:4px">${escapeHtml(doc.label?.trim() || '(sem rótulo)')}</div>
+              <div style="font-size:12px;color:#64748b;margin-bottom:6px">${doc.lat.toFixed(5)}, ${doc.lng.toFixed(5)}</div>
+              <a href="/${encodeURIComponent(doc.slug)}"
+                 style="display:inline-block;padding:4px 8px;border:1px solid #e5e7eb;border-radius:6px;background:#f8fafc;text-decoration:none;color:#111827">
+                 Ver detalhes
+              </a>
+            </div>
+          `
+          L.popup().setLatLng([doc.lat, doc.lng]).setContent(html).openOn(map)
+          centerRef.current = { lat: doc.lat, lng: doc.lng }
+          initialFocusDoneRef.current = true
+        }
+      }
+    } catch {}
+
+    // Geolocalização do usuário (não “rouba” foco se já focou por slug)
     if ('geolocation' in navigator) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
+          if (initialFocusDoneRef.current) {
+            // Ainda assim atualiza dados ambientais para o centro atual
+            fetchEnvInfo(centerRef.current.lat, centerRef.current.lng).then(setEnvInfo).catch(() => setEnvInfo(null))
+            return
+          }
           const { latitude, longitude, accuracy } = pos.coords
           const here = [latitude, longitude]
-          map.setView(here, 15)
+          const focusZoom = basemap === 'gibs' ? 9 : 15
+          map.setView(here, focusZoom)
           L.circleMarker(here, {
             radius: 8, color: '#2563eb', weight: 2, fillColor: '#3b82f6', fillOpacity: 0.7
           }).addTo(map).bindPopup('Você está aqui').openPopup()
@@ -580,27 +444,30 @@ export default function MapPage() {
             L.circle(here, { radius: accuracy, color: '#60a5fa', weight: 1, fillOpacity: 0.12 }).addTo(map)
           }
           centerRef.current = { lat: latitude, lng: longitude }
-          fetchEnvInfo(latitude, longitude)
+          loadEnv(latitude, longitude)
         },
         () => {
-          console.warn('Não foi possível obter a localização.')
+          if (initialFocusDoneRef.current) {
+            fetchEnvInfo(centerRef.current.lat, centerRef.current.lng).then(setEnvInfo).catch(() => setEnvInfo(null))
+            return
+          }
           const c = map.getCenter()
           centerRef.current = c
-          fetchEnvInfo(c.lat, c.lng)
+          loadEnv(c.lat, c.lng)
         },
         { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
       )
     } else {
-      const c = map.getCenter()
-      centerRef.current = c
-      fetchEnvInfo(c.lat, c.lng)
+      if (!initialFocusDoneRef.current) {
+        const c = map.getCenter()
+        centerRef.current = c
+        loadEnv(c.lat, c.lng)
+      } else {
+        fetchEnvInfo(centerRef.current.lat, centerRef.current.lng).then(setEnvInfo).catch(() => setEnvInfo(null))
+      }
     }
 
-    // Carrega e desenha do storage (com slugs/popups de detalhes)
-    refreshPoints({ pan: false })
-
     return () => {
-      // ...existing cleanup...
       try { map.off('click', onMapClick) } catch {}
       map.remove()
     }
@@ -616,39 +483,26 @@ export default function MapPage() {
     baseLayerRef.current.addTo(mapInst.current)
   }, [basemap, gibsDate])
 
-  // NOVO: atualizar overlay NASA quando camada/data mudarem
+  // Atualizar overlay NASA quando camada/data mudarem
   useEffect(() => {
     if (!mapInst.current) return
-    // remove anterior
     if (nasaOverlayRef.current) {
       try { mapInst.current.removeLayer(nasaOverlayRef.current) } catch {}
       nasaOverlayRef.current = null
     }
-    // adiciona novo se houver seleção
     if (nasaLayer && nasaLayer !== 'none') {
       nasaOverlayRef.current = buildNasaOverlay(nasaLayer, gibsDate)
       nasaOverlayRef.current && nasaOverlayRef.current.addTo(mapInst.current)
     }
   }, [nasaLayer, gibsDate])
 
-  // NOVO: overlay de limites (países, estados e cidades) – transparente
-  function buildBoundariesOverlay() {
-    return L.tileLayer(
-      'https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
-      {
-        attribution: 'Esri, HERE, Garmin, © OpenStreetMap contributors, and the GIS user community'
-      }
-    )
-  }
-
-  // Adiciona ponto e salva, depois redesenha (popups já terão o botão)
+  // Adiciona ponto e salva, depois redesenha
   function addPoint(latNum, lngNum, lbl, opts = { save: true, pan: true }) {
     if (!mapInst.current || !userLayer.current) return
     if (opts.save) {
-      savePointToStorage({ lat: latNum, lng: lngNum, label: lbl })
+      savePoint({ lat: latNum, lng: lngNum, label: lbl })
       refreshPoints({ pan: opts.pan })
     } else {
-      // ...existing code for non-saved marker if needed...
       const marker = L.circleMarker([latNum, lngNum], {
         radius: 7, color: '#059669', weight: 2, fillColor: '#10b981', fillOpacity: 0.7
       }).addTo(userLayer.current)
@@ -657,13 +511,7 @@ export default function MapPage() {
     }
   }
 
-  // Utilitários no console
-  useEffect(() => {
-    window.addMapPoint = (a, b, c) => addPoint(a, b, c) // window.addMapPoint(lat, lng, label?)
-    window.listMapPoints = () => loadPointsFromStorage()
-    return () => { delete window.addMapPoint; delete window.listMapPoints }
-  }, [])
-
+  // NOVO: submissão do formulário (se ausente)
   function onSubmit(e) {
     e.preventDefault()
     const latNum = parseFloat(String(lat).replace(',', '.'))
@@ -673,22 +521,11 @@ export default function MapPage() {
     addPoint(latNum, lngNum, label?.trim(), { save: true, pan: true })
   }
 
-  function clearPoints() {
-    if (userLayer.current) userLayer.current.clearLayers()
-    if (confirm('Também remover os pontos salvos no navegador?')) {
-      clearPointsFromStorage()
-    }
-    // Após limpar storage (se confirmado), também atualiza lista
-    refreshPoints({ pan: false })
-  }
-
-  // NOVO: focar no mapa
+  // NOVO: focar no mapa e abrir popup (se ausente)
   function handleShow(id) {
     const doc = points.find(p => p.id === id)
     if (!doc || !mapInst.current) return
     mapInst.current.setView([doc.lat, doc.lng], 15)
-
-    // Abre popup com nome do ponto (e coords/link)
     const html = `
       <div style="min-width:180px">
         <div style="font-weight:600;margin-bottom:4px">${escapeHtml(doc.label?.trim() || '(sem rótulo)')}</div>
@@ -702,7 +539,22 @@ export default function MapPage() {
     L.popup().setLatLng([doc.lat, doc.lng]).setContent(html).openOn(mapInst.current)
   }
 
-  // NOVO: editar ponto
+  // Utilitários no console
+  useEffect(() => {
+    window.addMapPoint = (a, b, c) => addPoint(a, b, c)
+    window.listMapPoints = () => loadPoints()
+    return () => { delete window.addMapPoint; delete window.listMapPoints }
+  }, [])
+
+  function clearPoints() {
+    if (userLayer.current) userLayer.current.clearLayers()
+    if (confirm('Também remover os pontos salvos no navegador?')) {
+      clearAllPoints()
+    }
+    refreshPoints({ pan: false })
+  }
+
+  // Editar ponto (slug recalculado no service)
   function handleEdit(id) {
     const doc = points.find(p => p.id === id)
     if (!doc) return
@@ -714,88 +566,18 @@ export default function MapPage() {
     const lngNum = parseFloat(String(newLng).replace(',', '.'))
     if (!Number.isFinite(latNum) || !Number.isFinite(lngNum)) return alert('Coordenadas inválidas.')
     if (latNum < -90 || latNum > 90 || lngNum < -180 || lngNum > 180) return alert('Fora do intervalo válido.')
-
-    const others = loadPointsFromStorage().filter(p => p.id !== id)
-    const base = slugify(newLabel)
-    const newSlug = base ? ensureUniqueSlug(others, base, id) : doc.slug
-    const updated = updatePointInStorage(id, { label: newLabel.trim(), lat: latNum, lng: lngNum, slug: newSlug })
-    if (!updated) return alert('Falha ao atualizar o ponto.')
+    const ok = updatePoint(id, { label: newLabel.trim(), lat: latNum, lng: lngNum })
+    if (!ok) return alert('Falha ao atualizar o ponto.')
     refreshPoints({ pan: true })
   }
 
-  // NOVO: excluir ponto
+  // Excluir ponto
   function handleDelete(id) {
     const doc = points.find(p => p.id === id)
     if (!doc) return
     if (!confirm(`Excluir o ponto "${doc.label || '(sem rótulo)'}"?`)) return
-    removePointFromStorage(id)
+    removePoint(id)
     refreshPoints({ pan: false })
-  }
-
-  // NOVO: consulta vegetação próxima via Overpass (OSM)
-  async function fetchVegetationInfo(lat, lng, radius = 500) {
-    try {
-      setLoadingVeg(true)
-      setVegInfo(null)
-      // Seleciona usos do solo/natural/lazer que indicam vegetação
-      const q = `
-[out:json][timeout:25];
-(
-  nwr(around:${radius},${lat},${lng})[landuse~"^(forest|meadow|grass|orchard|vineyard|allotments|farmland)$"];
-  nwr(around:${radius},${lat},${lng})[natural~"^(wood|scrub|heath|grassland)$"];
-  nwr(around:${radius},${lat},${lng})[leisure~"^(park|garden|nature_reserve)$"];
-);
-out tags center 100;`
-      const res = await fetch('https://overpass-api.de/api/interpreter', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
-        body: 'data=' + encodeURIComponent(q)
-      })
-      const json = await res.json()
-      const els = Array.isArray(json?.elements) ? json.elements : []
-
-      const categories = {}
-      const names = new Set()
-
-      const pushCat = (k) => { categories[k] = (categories[k] || 0) + 1 }
-      const friendly = (tags = {}) => {
-        if (tags.landuse === 'forest') return 'Floresta'
-        if (tags.natural === 'wood') return 'Mata'
-        if (tags.natural === 'scrub') return 'Arbustos'
-        if (tags.natural === 'heath') return 'Charneca'
-        if (tags.natural === 'grassland') return 'Campos'
-        if (tags.landuse === 'meadow' || tags.landuse === 'grass') return 'Prado/Grama'
-        if (tags.leisure === 'park') return 'Parque'
-        if (tags.leisure === 'garden') return 'Jardim'
-        if (tags.leisure === 'nature_reserve') return 'Reserva'
-        if (tags.landuse === 'orchard') return 'Pomar'
-        if (tags.landuse === 'vineyard') return 'Vinhedo'
-        if (tags.landuse === 'allotments') return 'Hortas'
-        if (tags.landuse === 'farmland') return 'Agrícola'
-        return null
-      }
-
-      els.forEach(e => {
-        const k = friendly(e.tags || {})
-        if (k) pushCat(k)
-        const nm = (e.tags?.name || e.tags?.['name:pt'] || e.tags?.['name:en'])?.trim()
-        if (nm) names.add(nm)
-      })
-
-      setVegInfo({
-        lat: Number(lat), lng: Number(lng),
-        radius,
-        total: els.length,
-        categories,
-        names: Array.from(names).slice(0, 8),
-        at: new Date().toISOString()
-      })
-    } catch (e) {
-      console.warn('Falha ao obter vegetação (Overpass)', e)
-      setVegInfo(null)
-    } finally {
-      setLoadingVeg(false)
-    }
   }
 
   return (
@@ -976,10 +758,10 @@ out tags center 100;`
           maxWidth: isNarrow ? 'calc(100vw - 16px)' : 360,
           boxShadow: '0 10px 30px rgba(2,6,23,.12)',
           transition: 'all 0.3s ease',
-          opacity: 0.6, // Transparente por padrão
+          opacity: 0.6
         }}
-        onMouseEnter={(e) => e.currentTarget.style.opacity = '1'} // Opaco ao passar o mouse
-        onMouseLeave={(e) => e.currentTarget.style.opacity = '0.6'} // Volta transparente
+        onMouseEnter={(e) => { e.currentTarget.style.opacity = '1' }}
+        onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.6' }}
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -1009,7 +791,7 @@ out tags center 100;`
             </button>
 
             <button
-              onClick={() => fetchEnvInfo(centerRef.current.lat, centerRef.current.lng)}
+              onClick={() => loadEnv(centerRef.current.lat, centerRef.current.lng)}
               disabled={loadingEnv}
               style={{
                 padding: '6px 10px',
@@ -1027,7 +809,7 @@ out tags center 100;`
 
             {/* NOVO: Vegetação (500 m) */}
             <button
-              onClick={() => fetchVegetationInfo(centerRef.current.lat, centerRef.current.lng, 500)}
+              onClick={() => loadVeg(centerRef.current.lat, centerRef.current.lng, 500)}
               disabled={loadingVeg}
               style={{
                 padding: '6px 10px',
@@ -1204,31 +986,37 @@ out tags center 100;`
                     <div style={{ fontSize: 12, color: '#64748b' }}>
                       Raio: ~{Math.round(vegInfo.radius)} m • Itens: {vegInfo.total}
                     </div>
-                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                      {Object.keys(vegInfo.categories).length === 0 && (
-                        <span style={{ color: '#94a3b8' }}>Nenhuma classe encontrada.</span>
-                      )}
-                      {Object.entries(vegInfo.categories).map(([k, v]) => (
-                        <span
-                          key={k}
-                          style={{
-                            background: '#f0fdf4',
-                            border: '1px solid #bbf7d0',
-                            color: '#14532d',
-                            padding: '4px 8px',
-                            borderRadius: 999,
-                            fontSize: 12
-                          }}
-                        >
-                          {k}: {v}
-                        </span>
-                      ))}
-                    </div>
-                    {!!vegInfo.names?.length && (
-                      <div style={{ fontSize: 12, color: '#64748b' }}>
-                        Próximos: {vegInfo.names.join(' · ')}
+
+                    {/* CORREÇÃO: agrupar os dois blocos com um fragmento */}
+                    <>
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                        {Object.keys(vegInfo.categories).length === 0 && (
+                          <span style={{ color: '#94a3b8' }}>Nenhuma classe encontrada.</span>
+                        )}
+                        {Object.entries(vegInfo.categories).map(([k, v]) => (
+                          <span
+                            key={k}
+                            style={{
+                              background: '#f0fdf4',
+                              border: '1px solid #bbf7d0',
+                              color: '#14532d',
+                              padding: '4px 8px',
+                              borderRadius: 999,
+                              fontSize: 12
+                            }}
+                          >
+                            {k}: {v}
+                          </span>
+                        ))}
                       </div>
-                    )}
+
+                      {vegInfo.names?.length > 0 && (
+                        <div style={{ fontSize: 12, color: '#64748b' }}>
+                          Próximos: {vegInfo.names.join(' · ')}
+                        </div>
+                      )}
+                    </>
+
                     <div style={{ fontSize: 11, color: '#94a3b8' }}>
                       Fonte: OpenStreetMap (Overpass) • {new Date(vegInfo.at).toLocaleString()}
                     </div>
