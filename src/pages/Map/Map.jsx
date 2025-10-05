@@ -29,6 +29,7 @@ import {
   fetchVegetationInfo,
   degToCompass,
 } from '../../api/envApi.js'
+import { Link } from 'react-router-dom'
 
 // MANTER somente helpers de UI necessários no Map (ex.: escapeHtml)
 function escapeHtml(s = '') {
@@ -598,7 +599,7 @@ export default function MapPage() {
 
         {/* Seletor de data (habilitado se basemap GIBS ou overlay NASA ativo) */}
         <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ fontSize: 14, color: '#64748b' }}>Data</span>
+          <span style={{ fontSize: 14, color: '#cbe1ffff' }}>Data</span>
           <input
             type="date"
             value={gibsDate}
@@ -612,7 +613,7 @@ export default function MapPage() {
 
         {/* NOVO: overlay NASA prioridade (blooms) */}
         <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ fontSize: 14, color: '#64748b' }}>NASA (blooms)</span>
+          <span style={{ fontSize: 14, color: '#cbe1ffff'}}>NASA (blooms)</span>
           <select
             value={nasaLayer}
             onChange={(e) => setNasaLayer(e.target.value)}
@@ -644,6 +645,11 @@ export default function MapPage() {
         <button type="button" onClick={() => setShowList(true)} style={{ padding: '6px 10px', marginLeft: 8, flex: '0 0 auto' }}>
           Meus pontos
         </button>
+          <Link to="/">
+            <button type="button" style={{ padding: '6px 10px', marginLeft: 8, flex: '0 0 auto' }}>
+          Voltar ao início
+            </button>
+          </Link>
       </form>
 
       {/* Inputs ocultos: câmera (fallback) e upload */}
