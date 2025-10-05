@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
+import { initPlantId, classifyImage } from '../../services/AI.js'
 
 // Utils de storage (iguais aos usados no Map.jsx)
 const STORE_PREFIX = 'bloomstack.points/'
@@ -47,6 +48,13 @@ export default function PointPage() {
   const [description, setDescription] = useState(point?.description || '')
   const [distanceKm, setDistanceKm] = useState(null)
 
+  // === IA: estados/refs de identificação
+  const imgRef = useRef(null)
+  const [plantPredLoading, setPlantPredLoading] = useState(false)
+  const [plantPred, setPlantPred] = useState(null) // { label, prob, topK[] }
+  const [plantError, setPlantError] = useState('')
+  const [plantReady, setPlantReady] = useState(false)
+
   useEffect(() => {
     if (!point) return
     if (!('geolocation' in navigator)) return
@@ -60,6 +68,79 @@ export default function PointPage() {
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     )
   }, [point?.id])
+
+  // === IA: inicializa modelo/labels (uma vez)
+  useEffect(() => {
+    let alive = true
+    ;(async () => {
+      try {
+        await initPlantId()
+        if (alive) setPlantReady(true)
+      } catch (e) {
+        console.error('Falha ao inicializar PlantID:', e)
+        if (alive) setPlantError('Falha ao inicializar o modelo de identificação.')
+      }
+    })()
+    return () => { alive = false }
+  }, [])
+
+  // === IA: classifica assim que a imagem (data URL) estiver decodificada e o modelo pronto
+  useEffect(() => {
+    setPlantPred(null)
+    setPlantError('')
+
+    if (!plantReady) return
+    const el = imgRef.current
+    if (!el) return
+    const src = el.currentSrc || el.src || ''
+    if (!src) return
+
+    let cancelled = false
+
+    async function run() {
+      try {
+        setPlantPredLoading(true)
+
+        // garante que a imagem está pronta (data URL às vezes dá complete=true sem decode)
+        if (!el.complete || el.naturalWidth === 0) {
+          try {
+            await el.decode()
+          } catch {
+            // fallback: força decodificação offscreen
+            await new Promise((resolve, reject) => {
+              const aux = new Image()
+              aux.onload = resolve
+              aux.onerror = reject
+              aux.src = src
+            })
+          }
+        }
+        if (cancelled) return
+
+        if (el.naturalWidth === 0 || el.naturalHeight === 0) {
+          throw new Error('Imagem não pôde ser decodificada')
+        }
+
+        const res = await classifyImage(el, 3)
+        if (cancelled) return
+        setPlantPred(res)
+      } catch (e) {
+        console.error('Erro na classificação:', e)
+        const msg = String(e?.message || e)
+        setPlantError(
+          /decodificad|decode|naturalWidth/i.test(msg)
+            ? 'Não foi possível decodificar a imagem. Tente salvar/reenviar novamente.'
+            : 'Falha ao processar a imagem.'
+        )
+        setPlantPred(null)
+      } finally {
+        if (!cancelled) setPlantPredLoading(false)
+      }
+    }
+
+    run()
+    return () => { cancelled = true }
+  }, [plantReady, photoUrl, point?.photoUrl]) // dispara quando muda a imagem visível
 
   function saveMeta() {
     if (!point) return
@@ -93,7 +174,7 @@ export default function PointPage() {
         </div>
       </header>
 
-      <img src={img} alt={`Foto de ${title}`} style={{ width: '100%', height: 'auto', borderRadius: 12, border: '1px solid #e5e7eb' }} />
+      <img ref={imgRef} src={img} alt={`Foto de ${title}`} style={{ width: '100%', height: 'auto', borderRadius: 12, border: '1px solid #e5e7eb' }} />
 
       {/* NOVO: Condições no momento da foto */}
       <section style={{ display: 'grid', gap: 8, padding: 12, border: '1px solid #e5e7eb', borderRadius: 12, background: '#ffffff' }}>
@@ -134,6 +215,32 @@ export default function PointPage() {
         ) : (
           <div style={{ color: '#94a3b8', fontSize: 13 }}>Sem dados de clima na captura.</div>
         )}
+
+        {/* Identificação da espécie */}
+        <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px dashed #e2e8f0' }}>
+          <div style={{ fontWeight: 600 }}>Espécie provável (nome científico)</div>
+
+          {plantPredLoading && (
+            <div style={{ color: '#64748b', marginTop: 4 }}>Processando imagem…</div>
+          )}
+
+          {!plantPredLoading && plantError && (
+            <div style={{ color: '#b91c1c', marginTop: 4 }}>{plantError}</div>
+          )}
+
+          {!plantPredLoading && !plantError && plantPred && (
+            <div style={{ marginTop: 4 }}>
+              {plantPred.label}{' '}
+              <span style={{ color: '#64748b' }}>
+                ({(plantPred.prob * 100).toFixed(1)}%)
+              </span>
+            </div>
+          )}
+
+          {!plantPredLoading && !plantError && !plantPred && (
+            <div style={{ color: '#94a3b8', marginTop: 4 }}>Aguardando imagem…</div>
+          )}
+        </div>
       </section>
 
       <section style={{ display: 'grid', gap: 8 }}>

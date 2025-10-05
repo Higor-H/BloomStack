@@ -626,13 +626,60 @@ export default function MapPage() {
     refreshPoints({ pan: false })
   }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  // Início do código!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
   return (
-    <div className="map-page" style={{ display: 'flex', flexDirection: 'column', height: '100dvh' }}>
-      <form
-        onSubmit={onSubmit}
-        className="map-form"
-        style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', marginBottom: 8 }}
-      >
+      <div className="map-page" style={{ display: 'flex', flexDirection: 'column', height: '100dvh' }}>
+
+          {/* camada de vidro */}
+          <div className="glass-card"></div>
+
+          {/* conteúdo da página */}
+          <form
+              onSubmit={onSubmit}
+              className="map-form"
+              style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', marginBottom: 8, zIndex: 20 }}
+          >
         {/* Alternador de mapa base */}
         <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <span style={{ fontSize: 14, color: '#cfdbedff' }}>Visão</span>
@@ -832,6 +879,8 @@ export default function MapPage() {
         onMouseEnter={(e) => { e.currentTarget.style.opacity = '1' }}
         onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.6' }}
       >
+
+          {/*Mapa*/}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span aria-hidden="true">🌤️</span>
