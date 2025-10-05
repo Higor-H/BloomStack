@@ -339,8 +339,6 @@ function openAddPointPopup(latlng) {
     uploadInputRef.current?.click()
   }
 
-  // REMOVIDO: botão cancelar
-
   row.appendChild(btnCam)
   row.appendChild(btnUpload)
   // REMOVIDO: row.appendChild(btnCancel)
@@ -853,7 +851,6 @@ function openAddPointPopup(latlng) {
           >
             <div className="modal__header">
               <strong>Novo ponto</strong>
-              <button className="modal__btn" onClick={cancelCapture}>Cancelar</button>
             </div>
 
             <div style={{ display: 'grid', gap: 8 }}>
