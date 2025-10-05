@@ -2,9 +2,20 @@ import reactLogo from './assets/react.svg'
 import viteLogo from '/vite.svg'
 import './Home.css'
 import {Link} from "react-router-dom";
+import { useEffect } from "react";
 
 
 function Home() {
+
+    useEffect(() => {
+        // adiciona classe no body
+        document.body.classList.add("home-body");
+
+        // remove quando sair da Home
+        return () => {
+            document.body.classList.remove("home-body");
+        };
+    }, []);
 
   return (
     <>

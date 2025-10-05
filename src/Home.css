@@ -34,7 +34,7 @@
   color: #888;
 }
 
-body {
+body.home-body {
     background: url("/src/assets/Floresta2.jpg") no-repeat center center fixed;
     background-size: cover; /* cobre toda a tela */
     font-family: sans-serif;
