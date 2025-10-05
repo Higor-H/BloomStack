@@ -20,7 +20,7 @@ function genId() {
 }
 
 // Salvar ponto
-export function savePoint({ lat, lng, label, description, photoUrl, capturedAt, captureEnv }) {
+export function savePoint({ lat, lng, label, description, photoUrl, capturedAt, captureEnv, scientificName}) {
   const id = genId()
   const all = loadPoints()
   const baseSlug = slugify(label) || `p-${Number(lat).toFixed(5)}-${Number(lng).toFixed(5)}`
@@ -33,7 +33,8 @@ export function savePoint({ lat, lng, label, description, photoUrl, capturedAt, 
     description: description || '',
     // NOVO: informações da captura
     capturedAt: capturedAt || new Date().toISOString(),
-    captureEnv: captureEnv || null
+    captureEnv: captureEnv || null,
+    scientificName: scientificName || ''
   }
   try {
     localStorage.setItem(`${STORE_PREFIX}${id}.json`, JSON.stringify(doc))
