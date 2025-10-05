@@ -623,6 +623,21 @@ export default function MapPage() {
     }
   }, [nasaLayer, gibsDate])
 
+  // Toggle dinâmico dos contornos (cidades/países)
+  useEffect(() => {
+    if (!mapInst.current) return
+    // remove camada anterior (se houver)
+    if (boundariesLayerRef.current) {
+      try { mapInst.current.removeLayer(boundariesLayerRef.current) } catch {}
+      boundariesLayerRef.current = null
+    }
+    // adiciona novamente se marcado
+    if (showBoundaries) {
+      boundariesLayerRef.current = buildBoundariesOverlay()
+      boundariesLayerRef.current.addTo(mapInst.current)
+    }
+  }, [showBoundaries])
+
   // Adiciona ponto e salva, depois redesenha
   function addPoint(latNum, lngNum, lbl, opts = { save: true, pan: true }) {
     if (!mapInst.current || !userLayer.current) return
@@ -834,6 +849,15 @@ export default function MapPage() {
           Back to home
             </button>
           </Link>
+        {/* Checkbox: Boundaries (cidades e países) */}
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <input
+            type="checkbox"
+            checked={showBoundaries}
+            onChange={(e) => setShowBoundaries(e.target.checked)}
+          />
+          <span style={{ fontSize: 14, color: '#cbe1ffff' }}>Boundaries</span>
+        </label>
       </form>
 
       {/* Inputs ocultos: câmera (fallback) e upload */}
