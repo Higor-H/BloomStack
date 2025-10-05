@@ -3,6 +3,8 @@ import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import './Map.css'
 import Camera from '../Camera/Camera.jsx'
+import { initPlantId, classifyImage } from '../../services/AI.js'
+
 
 // IMPORTS NOVOS: camadas do mapa (OSM/GIBS/overlays) e datas GIBS
 import {
@@ -57,6 +59,8 @@ export default function MapPage() {
   const [envInfo, setEnvInfo] = useState(null)
   const [loadingEnv, setLoadingEnv] = useState(false)
   const [nasaLayer, setNasaLayer] = useState('viirs_chla') // 'none' | 'viirs_chla' | 'modis_chla'
+  const [plantPredLoading, setPlantPredLoading] = useState(false)
+  const [plantPred, setPlantPred] = useState(null) // { label, prob, topK[] }
 
   const cameraInputRef = useRef(null)
   const uploadInputRef = useRef(null)
@@ -75,6 +79,47 @@ export default function MapPage() {
 
   const [loadingVeg, setLoadingVeg] = useState(false)
   const [vegInfo, setVegInfo] = useState(null)
+
+  useEffect(() => {
+    (async () => {
+      try {
+        await initPlantId()
+      } catch (e) {
+        console.error('Falha ao inicializar PlantID:', e)
+      }
+    })()
+  }, [])
+
+
+  useEffect(() => {
+    if (!captureOpen || !photoDataUrl) {
+      setPlantPred(null)
+      setPlantPredLoading(false)
+      return
+    }
+    // aguarda a imagem do modal carregar e então classifica
+    const imgEl = document.getElementById('imgPlant')
+    if (!imgEl) return
+    if (imgEl.complete) {
+      classifyNow()
+    } else {
+      imgEl.onload = () => classifyNow()
+      imgEl.onerror = () => setPlantPredLoading(false)
+    }
+
+    async function classifyNow() {
+      try {
+        setPlantPredLoading(true)
+        const res = await classifyImage(imgEl, 3) // top-3 internamente, exibimos top-1
+        setPlantPred(res)
+      } catch (e) {
+        console.error('Erro na classificação:', e)
+        setPlantPred(null)
+      } finally {
+        setPlantPredLoading(false)
+      }
+    }
+  }, [captureOpen, photoDataUrl])
 
   useEffect(() => {
     const onResize = () => setIsNarrow(window.innerWidth < 768) // < 768px = mobile/tablet pequeno
@@ -712,7 +757,25 @@ export default function MapPage() {
               </div>
 
               {photoDataUrl && (
-                <img src={photoDataUrl} alt="Pré-visualização da foto" style={{ width: '100%', borderRadius: 8, border: '1px solid #e5e7eb' }} />
+                <>
+                <img id='imgPlant' src={photoDataUrl} alt="Pré-visualização da foto" style={{ width: '100%', borderRadius: 8, border: '1px solid #e5e7eb' }} />
+                <div style={{ marginTop: 8 }}>
+                  {plantPredLoading && (
+                    <div style={{ color: '#64748b' }}>Identificando espécie…</div>
+                  )}
+                  {!plantPredLoading && plantPred && (
+                    <div>
+                      <div style={{ fontWeight: 600 }}>Espécie provável (nome científico)</div>
+                      <div style={{ marginTop: 4 }}>
+                        {plantPred.label} <span style={{ color: '#64748b' }}>({(plantPred.prob * 100).toFixed(1)}%)</span>
+                      </div>
+                    </div>
+                  )}
+                  {!plantPredLoading && !plantPred && (
+                    <div style={{ color: '#94a3b8' }}>Aguardando processamento…</div>
+                  )}
+                </div>
+                </>
               )}
 
               <label style={{ display: 'grid', gap: 6 }}>
