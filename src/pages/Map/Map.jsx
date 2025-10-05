@@ -907,10 +907,10 @@ function openAddPointPopup(latlng) {
           maxWidth: isNarrow ? 'calc(100vw - 16px)' : 360,
           boxShadow: '0 10px 30px rgba(2,6,23,.12)',
           transition: 'all 0.3s ease',
-          opacity: 0.6
+          opacity: isNarrow ? 1 : 0.6
         }}
-        onMouseEnter={(e) => { e.currentTarget.style.opacity = '1' }}
-        onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.6' }}
+          onMouseEnter={(e) => { if (!isNarrow) e.currentTarget.style.opacity = '1' }}
+          onMouseLeave={(e) => { if (!isNarrow) e.currentTarget.style.opacity = '0.6' }}
       >
 
           {/*Mapa*/}
