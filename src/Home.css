@@ -1,16 +1,16 @@
 .logo {
-    height: 25em; /* aumentei a logo inicial */
-    padding: 1.5em;
+    height: 20em; /* diminui para caber melhor */
+    padding: 0;   /* remove padding extra */
     will-change: transform, filter;
     transition: transform 0.3s ease-in-out, filter 0.6s ease-in-out;
 }
 
 .logo:hover {
-    transform: scale(1.2); /* aumenta a imagem em 20% */
+    transform: scale(1.2);
     filter:
-            drop-shadow(0 0 1em rgba(102, 51, 153, 0.7))  /* brilho suave */
-            drop-shadow(0 0 3em rgba(102, 51, 153, 0.7))  /* brilho médio */
-            drop-shadow(0 0 5em rgba(102, 51, 153, 0.7)); /* brilho intenso */
+            drop-shadow(0 0 1em rgba(102, 51, 153, 0.7))
+            drop-shadow(0 0 3em rgba(102, 51, 153, 0.7))
+            drop-shadow(0 0 5em rgba(102, 51, 153, 0.7));
 }
 
 
