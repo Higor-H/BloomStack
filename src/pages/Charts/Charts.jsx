@@ -218,7 +218,7 @@ export default function ChartsPage() {
         pol.weed ?? ''
       ])
     }
-    downloadCsv('bloomstack-dados-coletados.csv', rows)
+    downloadCsv('bloomstack-collected-data.csv', rows)
   }
 
   return (
@@ -229,27 +229,27 @@ export default function ChartsPage() {
       {/* toolbar com o mesmo estilo do Map.jsx */}
       <form className="map-form" style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', marginBottom: 8 }}>
         <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ fontSize: 14, color: '#cfdbedff' }}>Início</span>
+          <span style={{ fontSize: 14, color: '#cfdbedff' }}>Start</span>
           <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} style={{ padding: '6px 8px' }} />
         </label>
         <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ fontSize: 14, color: '#cfdbedff' }}>Fim</span>
+          <span style={{ fontSize: 14, color: '#cfdbedff' }}>End</span>
           <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} style={{ padding: '6px 8px' }} />
         </label>
         <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ fontSize: 14, color: '#cfdbedff' }}>Agrupar por</span>
+          <span style={{ fontSize: 14, color: '#cfdbedff' }}>Group by</span>
           <select value={groupMode} onChange={(e) => setGroupMode(e.target.value)} style={{ padding: '6px 8px' }}>
-            <option value="month">Mês</option>
-            <option value="season">Estação</option>
+            <option value="month">Month</option>
+            <option value="season">Season</option>
           </select>
         </label>
 
         <button type="button" onClick={handleExportCsv} style={{ padding: '6px 10px' }}>
-          Exportar CSV
+          Export CSV
         </button>
         <Link to="/">
           <button type="button" style={{ padding: '6px 10px' }}>
-            Voltar ao inicio
+            Back to home
           </button>
         </Link>
       </form>
@@ -258,61 +258,61 @@ export default function ChartsPage() {
       <div style={{ display: 'grid', gap: 12 }}>
         {/* Resumo */}
         <section style={{ display:'grid', gap: 8, padding:12, border:'1px solid #e2e8f0', borderRadius:12, background:'#ffffff' }}>
-          <strong>Resumo</strong>
+          <strong>Summary</strong>
           <div style={{ display:'flex', gap: 10, flexWrap:'wrap' }}>
             <span style={{ background:'#f8fafc', border:'1px solid #e2e8f0', padding:'6px 10px', borderRadius:999, fontSize:12, color:'#0f172a' }}>
               Total: <strong>{total}</strong>
             </span>
             <span style={{ background:'#ecfccb', border:'1px solid #d9f99d', padding:'6px 10px', borderRadius:999, fontSize:12, color:'#365314' }}>
-              Com nome científico: <strong>{withSci}</strong>
+              With scientific name: <strong>{withSci}</strong>
             </span>
             <span style={{ background:'#fff7ed', border:'1px solid #fed7aa', padding:'6px 10px', borderRadius:999, fontSize:12, color:'#7c2d12' }}>
-              Sem nome científico: <strong>{withoutSci}</strong>
+              Without scientific name: <strong>{withoutSci}</strong>
             </span>
             <span style={{ background:'#eef2ff', border:'1px solid #c7d2fe', padding:'6px 10px', borderRadius:999, fontSize:12, color:'#3730a3' }}>
-              Espécies únicas: <strong>{uniqueSpecies}</strong>
+              Unique species: <strong>{uniqueSpecies}</strong>
             </span>
           </div>
         </section>
 
         {/* Linha do tempo de floração (capturas por mês) */}
         <section className="charts-section">
-          <strong className="charts-title">Coletas por {groupMode === 'season' ? 'estação' : 'mês'}</strong>
+          <strong className="charts-title">Observations by {groupMode === 'season' ? 'season' : 'month'}</strong>
           {(() => {
             const series = groupMode === 'season' ? seasonsSeries : monthsSeries
             return series.length === 0
-              ? <div className="charts-empty">Sem datas de captura registradas.</div>
+              ? <div className="charts-empty">No capture dates recorded.</div>
               : <BarList data={series} />
           })()}
           <small className="charts-hint">
-            Usa a data registrada no momento da captura{groupMode === 'season' ? ' e a latitude para determinar o hemisfério.' : '.'}
+            Uses the date recorded at capture time{groupMode === 'season' ? ' and latitude to determine the hemisphere.' : '.'}
           </small>
         </section>
 
         {/* Distribuição por espécie */}
         <section style={{ display:'grid', gap: 8, padding:12, border:'1px solid #e2e8f0', borderRadius:12, background:'#ffffff' }}>
-          <strong className="charts-title">Top espécies (por observações)</strong>
+          <strong className="charts-title">Top species (by observations)</strong>
           {speciesTop.length === 0 ? (
-            <div style={{ color:'#94a3b8' }}>Sem nomes científicos salvos.</div>
+            <div style={{ color:'#94a3b8' }}>No scientific names saved.</div>
           ) : (
             <BarList data={speciesTop} />
           )}
-          <small className="charts-hint">Considera o campo “Nome Científico” salvo em cada ponto.</small>
+          <small className="charts-hint">Considers the “Scientific Name” field saved in each point.</small>
         </section>
 
         {/* Condições ambientais médias na captura */}
         <section style={{ display:'grid', gap: 8, padding:12, border:'1px solid #e2e8f0', borderRadius:12, background:'#ffffff' }}>
-          <strong className="charts-title">Condições ambientais médias (na captura)</strong>
+          <strong className="charts-title">Average environmental conditions (at capture)</strong>
           {envAverages.samples ? (
             <div style={{ display:'flex', gap: 8, flexWrap:'wrap' }}>
               <span style={{ background:'#ecfeff', border:'1px solid #bae6fd', color:'#075985', padding:'6px 10px', borderRadius:999, fontSize:12 }}>
-                Vento: {envAverages.windSpeed ?? '—'} km/h
+                Wind: {envAverages.windSpeed ?? '—'} km/h
               </span>
               <span style={{ background:'#f1f5f9', border:'1px solid #e2e8f0', color:'#334155', padding:'6px 10px', borderRadius:999, fontSize:12 }}>
-                Direção: {envAverages.windDir != null ? `${envAverages.windDir}°` : '—'}
+                Direction: {envAverages.windDir != null ? `${envAverages.windDir}°` : '—'}
               </span>
               <span style={{ background:'#eef2ff', border:'1px solid #c7d2fe', color:'#3730a3', padding:'6px 10px', borderRadius:999, fontSize:12 }}>
-                Umidade: {envAverages.humidity ?? '—'}%
+                Humidity: {envAverages.humidity ?? '—'}%
               </span>
               <span style={{ background:'#f8fafc', border:'1px solid #e2e8f0', color:'#0f172a', padding:'6px 10px', borderRadius:999, fontSize:12 }}>
                 PM2.5: {envAverages.pm25 ?? '—'} µg/m³
@@ -325,10 +325,10 @@ export default function ChartsPage() {
               </span>
             </div>
           ) : (
-            <div style={{ color:'#94a3b8' }}>Sem amostras ambientais suficientes.</div>
+            <div style={{ color:'#94a3b8' }}>Not enough environmental samples.</div>
           )}
           <small className="charts-hint">
-            Baseado em {envAverages.samples || 0} observações com dados ambientais.
+            Based on {envAverages.samples || 0} observations with environmental data.
           </small>
         </section>
       </div>
