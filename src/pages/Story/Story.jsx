@@ -185,7 +185,7 @@ const Story = () => {
         <div className="section-content">
           <div className="hero-overlay">
             <h1 className="hero-title">Florecendo Ideias</h1>
-            <p className="hero-sub">Voce sabia as que as plantas são a base para a vida da Terra?</p>
+            <p className="hero-sub">Voce sabiaa as que as plantas são a base para a vida da Terra?</p>
             <p className="hero-sub">Em meio as petalas que voam pelo vento, que cobrem o chão no verão, que dão a belaza da primavera, essas plantas gurdam segredos e habilidade unicas.</p>
             <p className="hero-sub">Elas são quimica, fisica, biologia e vida.</p>
             <p className="hero-sub">Polinizadores</p>
