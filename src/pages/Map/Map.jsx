@@ -3,6 +3,8 @@ import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import './Map.css'
 import Camera from '../Camera/Camera.jsx'
+import { initPlantId, classifyImage } from '../../services/AI.js'
+
 
 // IMPORTS NOVOS: camadas do mapa (OSM/GIBS/overlays) e datas GIBS
 import {
@@ -29,6 +31,7 @@ import {
   fetchVegetationInfo,
   degToCompass,
 } from '../../api/envApi.js'
+import { Link } from 'react-router-dom'
 
 // MANTER somente helpers de UI necessários no Map (ex.: escapeHtml)
 function escapeHtml(s = '') {
@@ -56,6 +59,8 @@ export default function MapPage() {
   const [envInfo, setEnvInfo] = useState(null)
   const [loadingEnv, setLoadingEnv] = useState(false)
   const [nasaLayer, setNasaLayer] = useState('viirs_chla') // 'none' | 'viirs_chla' | 'modis_chla'
+  const [plantPredLoading, setPlantPredLoading] = useState(false)
+  const [plantPred, setPlantPred] = useState(null) // { label, prob, topK[] }
 
   const cameraInputRef = useRef(null)
   const uploadInputRef = useRef(null)
@@ -74,6 +79,47 @@ export default function MapPage() {
 
   const [loadingVeg, setLoadingVeg] = useState(false)
   const [vegInfo, setVegInfo] = useState(null)
+
+  useEffect(() => {
+    (async () => {
+      try {
+        await initPlantId()
+      } catch (e) {
+        console.error('Falha ao inicializar PlantID:', e)
+      }
+    })()
+  }, [])
+
+
+  useEffect(() => {
+    if (!captureOpen || !photoDataUrl) {
+      setPlantPred(null)
+      setPlantPredLoading(false)
+      return
+    }
+    // aguarda a imagem do modal carregar e então classifica
+    const imgEl = document.getElementById('imgPlant')
+    if (!imgEl) return
+    if (imgEl.complete) {
+      classifyNow()
+    } else {
+      imgEl.onload = () => classifyNow()
+      imgEl.onerror = () => setPlantPredLoading(false)
+    }
+
+    async function classifyNow() {
+      try {
+        setPlantPredLoading(true)
+        const res = await classifyImage(imgEl, 3) // top-3 internamente, exibimos top-1
+        setPlantPred(res)
+      } catch (e) {
+        console.error('Erro na classificação:', e)
+        setPlantPred(null)
+      } finally {
+        setPlantPredLoading(false)
+      }
+    }
+  }, [captureOpen, photoDataUrl])
 
   useEffect(() => {
     const onResize = () => setIsNarrow(window.innerWidth < 768) // < 768px = mobile/tablet pequeno
@@ -598,7 +644,7 @@ export default function MapPage() {
 
         {/* Seletor de data (habilitado se basemap GIBS ou overlay NASA ativo) */}
         <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ fontSize: 14, color: '#64748b' }}>Data</span>
+          <span style={{ fontSize: 14, color: '#cbe1ffff' }}>Data</span>
           <input
             type="date"
             value={gibsDate}
@@ -612,7 +658,7 @@ export default function MapPage() {
 
         {/* NOVO: overlay NASA prioridade (blooms) */}
         <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ fontSize: 14, color: '#64748b' }}>NASA (blooms)</span>
+          <span style={{ fontSize: 14, color: '#cbe1ffff'}}>NASA (blooms)</span>
           <select
             value={nasaLayer}
             onChange={(e) => setNasaLayer(e.target.value)}
@@ -644,6 +690,11 @@ export default function MapPage() {
         <button type="button" onClick={() => setShowList(true)} style={{ padding: '6px 10px', marginLeft: 8, flex: '0 0 auto' }}>
           Meus pontos
         </button>
+          <Link to="/">
+            <button type="button" style={{ padding: '6px 10px', marginLeft: 8, flex: '0 0 auto' }}>
+          Voltar ao início
+            </button>
+          </Link>
       </form>
 
       {/* Inputs ocultos: câmera (fallback) e upload */}
@@ -706,7 +757,25 @@ export default function MapPage() {
               </div>
 
               {photoDataUrl && (
-                <img src={photoDataUrl} alt="Pré-visualização da foto" style={{ width: '100%', borderRadius: 8, border: '1px solid #e5e7eb' }} />
+                <>
+                <img id='imgPlant' src={photoDataUrl} alt="Pré-visualização da foto" style={{ width: '100%', borderRadius: 8, border: '1px solid #e5e7eb' }} />
+                <div style={{ marginTop: 8 }}>
+                  {plantPredLoading && (
+                    <div style={{ color: '#64748b' }}>Identificando espécie…</div>
+                  )}
+                  {!plantPredLoading && plantPred && (
+                    <div>
+                      <div style={{ fontWeight: 600 }}>Espécie provável (nome científico)</div>
+                      <div style={{ marginTop: 4 }}>
+                        {plantPred.label} <span style={{ color: '#64748b' }}>({(plantPred.prob * 100).toFixed(1)}%)</span>
+                      </div>
+                    </div>
+                  )}
+                  {!plantPredLoading && !plantPred && (
+                    <div style={{ color: '#94a3b8' }}>Aguardando processamento…</div>
+                  )}
+                </div>
+                </>
               )}
 
               <label style={{ display: 'grid', gap: 6 }}>
