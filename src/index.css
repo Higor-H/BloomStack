@@ -42,16 +42,16 @@ button {
     font-size: 1em;
     font-weight: 600;
     font-family: inherit;
-    background: rgba(120, 80, 255, 0.25); /* roxo translucido */
+    background: rgba(88, 52, 206, 0.783); /* roxo mais forte no hover */
     backdrop-filter: blur(10px);
-    color: #e8ffe8; /* texto verdinho claro */
+    color: #e1fee4; /* texto verdinho claro */
     cursor: pointer;
     transition: all 0.3s ease;
     box-shadow: 0 4px 20px rgba(120, 80, 255, 0.3);
 }
 
 button:hover {
-    background: rgba(120, 80, 255, 0.45); /* roxo mais forte no hover */
+    background: rgba(104, 72, 209, 0.578); /* roxo translucido */
     border-color: #64ff96;
     color: #ffffff;
     box-shadow: 0 0 25px rgba(100, 255, 150, 0.4);

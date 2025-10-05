@@ -41,9 +41,9 @@ export default function FeedPage() {
         <div className="feed-header">
           <h1>Feed de flores</h1>
           <div className="feed-actions">
-            <Link to="/" className="btn-link">Início</Link>
-            <Link to="/maps" className="btn-link">Mapa</Link>
-            <button className="btn" onClick={refresh}>Atualizar</button>
+            <Link to="/"> <button className="button"> Início </button> </Link>
+            <Link to="/maps"> <button className="button"> Mapa </button> </Link>
+            <button className="button" onClick={refresh}>Atualizar</button>
           </div>
         </div>
 
