@@ -259,71 +259,58 @@ export default function MapPage() {
   }
 
   // Popup ao clicar no mapa para oferecer: Bater foto ou Upload
-  function openAddPointPopup(latlng) {
-    // atualiza ref e estado imediatamente
-    const coord = { lat: latlng.lat, lng: latlng.lng }
-    pendingCoordRef.current = coord
-    setPendingCoord(coord)
+function openAddPointPopup(latlng) {
+  const coord = { lat: latlng.lat, lng: latlng.lng }
+  pendingCoordRef.current = coord
+  setPendingCoord(coord)
 
-    const wrap = document.createElement('div')
-    wrap.style.minWidth = '200px'
+  const wrap = document.createElement('div')
+  wrap.style.minWidth = '200px'
 
-    const title = document.createElement('div')
-    title.style.fontWeight = '600'
-    title.style.marginBottom = '6px'
-    title.textContent = 'Adicionar ponto aqui?'
-    wrap.appendChild(title)
+  const title = document.createElement('div')
+  title.style.fontWeight = '600'
+  title.style.marginBottom = '6px'
+  title.textContent = 'Adicionar ponto aqui?'
+  wrap.appendChild(title)
 
-    const coords = document.createElement('div')
-    coords.style.fontSize = '12px'
-    coords.style.color = '#64748b'
-    coords.style.marginBottom = '8px'
-    coords.textContent = `${latlng.lat.toFixed(5)}, ${latlng.lng.toFixed(5)}`
-    wrap.appendChild(coords)
+  const coords = document.createElement('div')
+  coords.style.fontSize = '12px'
+  coords.style.color = '#64748b'
+  coords.style.marginBottom = '8px'
+  coords.textContent = `${latlng.lat.toFixed(5)}, ${latlng.lng.toFixed(5)}`
+  wrap.appendChild(coords)
 
-    const row = document.createElement('div')
-    row.style.display = 'flex'
-    row.style.gap = '6px'
+  const row = document.createElement('div')
+  row.style.display = 'flex'
+  row.style.gap = '6px'
 
-    const btnCam = document.createElement('button')
-    btnCam.textContent = 'Bater foto (câmera)'
-    btnCam.style.padding = '4px 8px'
-    btnCam.style.border = '1px solid #e5e7eb'
-    btnCam.style.borderRadius = '6px'
-    btnCam.style.background = '#aaff00ff'
-    btnCam.onclick = () => {
-      mapInst.current?.closePopup()
-      // passa a coord explícita para evitar depender do estado
-      startCameraCapture(coord)
-    }
-
-    const btnUpload = document.createElement('button')
-    btnUpload.textContent = 'Fazer upload'
-    btnUpload.style.padding = '4px 8px'
-    btnUpload.style.border = '1px solid #e5e7eb'
-    btnUpload.style.borderRadius = '6px'
-    btnUpload.style.background = '#f8fafc'
-    btnUpload.onclick = () => {
-      mapInst.current?.closePopup()
-      // coord já está no ref; apenas abre o input
-      uploadInputRef.current?.click()
-    }
-
-    const btnCancel = document.createElement('button')
-    btnCancel.textContent = 'Cancelar'
-    btnCancel.style.padding = '4px 8px'
-    btnCancel.style.border = '1px solid #e5e7eb'
-    btnCancel.style.borderRadius = '6px'
-    btnCancel.style.background = '#fee2e2'
-    btnCancel.onclick = () => mapInst.current?.closePopup()
-
-    row.appendChild(btnCam)
-    row.appendChild(btnUpload)
-    row.appendChild(btnCancel)
-    wrap.appendChild(row)
-
-    L.popup().setLatLng(latlng).setContent(wrap).openOn(mapInst.current)
+  const btnCam = document.createElement('button')
+  btnCam.className = 'button'
+  btnCam.textContent = 'Bater foto (câmera)'
+  // Remove TODOS os estilos inline para a classe CSS funcionar
+  btnCam.onclick = () => {
+    mapInst.current?.closePopup()
+    startCameraCapture(coord)
   }
+
+  const btnUpload = document.createElement('button')
+  btnUpload.className = 'button'
+  btnUpload.textContent = 'Fazer upload'
+  // Remove TODOS os estilos inline para a classe CSS funcionar
+  btnUpload.onclick = () => {
+    mapInst.current?.closePopup()
+    uploadInputRef.current?.click()
+  }
+
+  // REMOVIDO: botão cancelar
+
+  row.appendChild(btnCam)
+  row.appendChild(btnUpload)
+  // REMOVIDO: row.appendChild(btnCancel)
+  wrap.appendChild(row)
+
+  L.popup().setLatLng(latlng).setContent(wrap).openOn(mapInst.current)
+}
 
   // Substitui o antigo handler condicionado por "selectingCoord" – agora sempre mostra popup
   useEffect(() => {
