@@ -89,7 +89,7 @@ export default function PointPage() {
   const capEnv = point.captureEnv || null
 
   return (
-    <div style={{ padding: 16, display: 'grid', gap: 12 }}>
+    <div style={{ padding: 16, display: 'grid', gap: 12, zIndex: 1 }}>
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
         <h1 style={{ margin: 0 }}>{title}</h1>
         {/* Actions: include "View on map" */}

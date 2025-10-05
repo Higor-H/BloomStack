@@ -232,7 +232,7 @@ export default function ChartsPage() {
   }
 
   return (
-    <div className="map-page map-page-charts" style={{ display: 'flex', flexDirection: 'column', minHeight: '100dvh' }}>
+    <div className="map-page map-page-charts" style={{ display: 'flex', flexDirection: 'column', minHeight: '100dvh', zIndex: 1 }}>
       {/* camada de vidro para manter o “look” */}
       <div className="glass-card-charts"></div>
 
