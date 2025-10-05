@@ -1,7 +1,7 @@
 
-# BloomStack
+# FloraQuest
 
-BloomStack is a modern web application for plant recognition, environmental data visualization, and interactive storytelling. Built with React and Vite, it leverages machine learning models for plant identification and provides a rich user experience with maps, charts, and camera integration.
+FloraQuest is a modern web application for plant recognition, environmental data visualization, and interactive storytelling. Built with React and Vite, it leverages machine learning models for plant identification and provides a rich user experience with maps, charts, and camera integration.
 
 ## Features
 
@@ -50,7 +50,7 @@ projeto/BloomStack/
 1. Clone the repository:
 	```bash
 	git clone https://github.com/Higor-H/BloomStack.git
-	cd BloomStack/projeto/BloomStack
+	cd /BloomStack
 	```
 2. Install dependencies:
 	```bash
@@ -98,4 +98,4 @@ Repository: https://github.com/joergmlpts/nature-id?tab=MIT-1-ov-file
 
 Usage: Was used the trained model for identifying scientific names of plants.
 
-*BloomStack: Growing knowledge, one plant at a time.*
+*FloraQuest: Growing knowledge, one plant at a time.*
