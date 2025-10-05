@@ -283,7 +283,7 @@ export default function ChartsPage() {
       {/* conteúdo com cartões no mesmo espírito da UI do app */}
       <div style={{ display: 'grid', gap: 12 }}>
         {/* Resumo */}
-        <section style={{ display:'grid', gap: 8, padding:12, border:'1px solid #e2e8f0', borderRadius:12, background:'#ffffff' }}>
+        <section style={{ display:'grid', gap: 8, padding:12, border:'1px solid #e2e8f0', borderRadius:12, background:'#ffffff', color: 'black' }}>
           <strong>Summary</strong>
           <div style={{ display:'flex', gap: 10, flexWrap:'wrap' }}>
             <span style={{ background:'#f8fafc', border:'1px solid #e2e8f0', padding:'6px 10px', borderRadius:999, fontSize:12, color:'#0f172a' }}>

@@ -132,9 +132,13 @@ body.story-active #root {
 
 /* Oculta as pétalas (canvas) quando a sessão 3 está visível */
 .story-no-petals .story-canvas--fixed {
-  opacity: 0;
-  visibility: hidden;
-  transition: opacity .35s ease;
+  opacity: var(--petals-opacity, 0);
+  visibility: visible; /* mantém o canvas no DOM */
+  transition: opacity 0.35s ease;
+}
+.story-canvas--fixed {
+  opacity: 1; /* valor padrão quando não está escondido */
+  transition: opacity 0.35s ease; 
 }
 
 /* Conteúdo das sessões com transição suave */
@@ -439,4 +443,63 @@ body.story-active #root {
   0%   { opacity: 0; transform: translate(-50%, -50%) scale(var(--ps, .8)); }
   15%  { opacity: .9; }
   100% { opacity: 0; transform: translate(calc(-50% + var(--tx, 0px)), calc(-50% + var(--ty, -40px))) scale(.5); }
+}
+
+/* comportamento do cursor e visibilidade */
+.bee-field { position: absolute; inset: 0; overflow: visible; pointer-events: none; }
+.bee-field .bee { position: absolute; width: 34px; height: 26px; transform-origin: center; opacity: 0; transition: opacity .12s linear, transform .12s linear; z-index: 10; pointer-events: none; }
+
+
+
+/* trail dots */
+.bee-trail { position: absolute; inset: 0; pointer-events: none; }
+.trail-dot { position: absolute; width: 8px; height: 8px; border-radius: 999px; background: radial-gradient(circle at 35% 35%, #fff7b3 0 40%, #f2c94c 60%); box-shadow: 0 0 6px rgba(210,180,20,.6); opacity: 0; transform: translate3d(0,0,0) scale(1); }
+
+
+/* esconde cursor quando o host tiver a classe has-bee */
+.has-bee, .has-bee * { cursor: none !important; }
+
+
+/* pólen emitido pela abelha (rastro visível) */
+.bee-pollen { position: absolute; width: 8px; height: 8px; border-radius: 999px; transform: translate(-50%, -50%); pointer-events: none; background: radial-gradient(circle at 35% 35%, #fff7b3 0 40%, #f2c94c 60%); box-shadow: 0 0 8px rgba(210,180,20,.8); animation: bee-pollen-fly 900ms cubic-bezier(.2,.8,.2,1) var(--pd,0s) forwards; }
+@keyframes bee-pollen-fly {
+0% { opacity: 1; transform: translate(-50%, -50%) scale(var(--ps,1)); }
+70% { opacity: 0.9; }
+100% { opacity: 0; transform: translate(calc(-50% + var(--tx, 0px)), calc(-50% + var(--ty, -40px))) scale(.4); }
+}
+
+
+/* quando quiser que a abelha apareça instantaneamente (já controlado pelo JS) */
+
+
+.back-to-top {
+  position: fixed;       /* fixa no viewport */
+  right: 20px;           /* canto inferior direito */
+  bottom: 20px;
+  padding: 10px 14px;
+  font-size: 14px;
+  font-weight: bold;
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  z-index: 999;          /* acima da abelha e de todo conteúdo */
+  pointer-events: auto;  /* garante que seja clicável */
+  transition: background 0.3s, transform 0.2s;
+}
+
+.back-to-top:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: translateY(-2px);
+}
+
+
+::-webkit-scrollbar {
+  display: none;
+}
+html, body {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
