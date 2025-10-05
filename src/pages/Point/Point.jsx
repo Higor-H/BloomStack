@@ -91,11 +91,12 @@ export default function PointPage() {
   return (
     <div style={{ padding: 16, display: 'grid', gap: 12, zIndex: 1 }}>
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-        <h1 style={{ margin: 0 }}>{title}</h1>
+        <h1 style={{margin: 0, color: '#e1fee4' }}>{title}</h1>
         {/* Actions: include "View on map" */}
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <Link to={`/maps?slug=${encodeURIComponent(point.slug)}`}>View on map</Link>
-          <Link to="/maps">Back to map</Link>
+          <Link to={`/maps?slug=${encodeURIComponent(point.slug)}`}> <button className='button'> View on map</button> </Link>
+          <Link to="/maps"> <button className='button'> Back to map </button> </Link>
+          <Link to="/feed"> <button className="button"> Back to feed </button> </Link>
         </div>
       </header>
 
@@ -143,7 +144,7 @@ export default function PointPage() {
       </section>
 
       <section style={{ display: 'grid', gap: 8 }}>
-        <label style={{ display: 'grid', gap: 6 }}>
+        <label style={{ display: 'grid', gap: 6, color:'#e1fee4' }}>
           <strong>Scientific Name</strong>
             <textarea
               placeholder="e.g., Handroanthus albus"
@@ -152,7 +153,7 @@ export default function PointPage() {
               style={{ padding: 8, borderRadius: 8, border: '1px solid #e5e7eb' }}
             />
         </label>
-        <strong>Description</strong>
+        <strong style={{ color: '#e1fee4' }}>Description</strong>
         <textarea
           rows={4}
           placeholder="Write a description..."
@@ -160,14 +161,14 @@ export default function PointPage() {
           onChange={e => setDescription(e.target.value)}
           style={{ padding: 8, borderRadius: 8, border: '1px solid #e5e7eb' }}
         />
-        <button onClick={saveMeta} style={{ padding: '6px 10px', border: '1px solid #e5e7eb', borderRadius: 8, background: '#00ff22ff', width: 'fit-content' }}>
+        <button className='button' onClick={saveMeta} style={{ padding: '6px 10px', width: 'fit-content' }}>
           Save
         </button>
       </section>
 
       <section style={{ color: '#475569' }}>
-        <div style={{ color: '#ffffffff' }} ><strong>Coordinates:</strong> {point.lat.toFixed(6)}, {point.lng.toFixed(6)}</div>
-        <div style={{ color: '#ffffffff' }}><strong >Distance to you:</strong> {distanceKm == null ? '—' : `${distanceKm.toFixed(2)} km`}</div>
+        <div style={{ color: '#e1fee4' }} ><strong>Coordinates:</strong> {point.lat.toFixed(6)}, {point.lng.toFixed(6)}</div>
+        <div style={{ color: '#e1fee4' }}><strong >Distance to you:</strong> {distanceKm == null ? '—' : `${distanceKm.toFixed(2)} km`}</div>
       </section>
     </div>
   )

@@ -25,6 +25,7 @@
   margin: 0;
   font-size: 28px;
   margin-bottom: 20px;
+  color: #e1fee4;
 }
 .feed-actions {
   display: flex;
@@ -44,7 +45,7 @@
   cursor: pointer;
 }
 .btn:hover, .btn-link:hover { background: #eef2f7; }
-.feed-subtitle { color: #64748b; display: block; margin-top: 6px; }
+.feed-subtitle { color: #e1fee4; display: block; margin-top: 6px; }
 
 /* Grid do feed */
 .feed-grid {
@@ -72,6 +73,17 @@
   transform: translateY(-2px);
   box-shadow: 0 10px 25px rgba(2, 6, 23, 0.12);
   border-color: #cbd5e1;
+  background-color: #5834cec8;
+}
+
+@media (hover: none) and (pointer: coarse) {
+  .feed-item:active,
+  .feed-item:focus {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px rgba(2, 6, 23, 0.12);
+    border-color: #cbd5e1;
+    background-color: #5834cec8;
+  }
 }
 
 /* Miniatura 70x70 bem estilizada */
@@ -101,7 +113,7 @@
 .meta .title {
   font-weight: 600;
   line-height: 1.2;
-    color: black;
+  color: #e1fee4;
 }
 .meta .coords {
   font-size: 12px;
