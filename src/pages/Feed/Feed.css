@@ -101,6 +101,7 @@
 .meta .title {
   font-weight: 600;
   line-height: 1.2;
+    color: black;
 }
 .meta .coords {
   font-size: 12px;

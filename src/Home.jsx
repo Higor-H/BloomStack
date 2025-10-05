@@ -38,14 +38,23 @@ function Home() {
           </div>
           <div className="card">
               <Link to="/maps">
-                  <button>Ir para Maps</button>
+                  <button>Go to Maps</button>
               </Link>
               <Link to="/feed" style={{ marginLeft: 8 }}>
-                  <button>Ver feed</button>
+                  <button>View feed</button>
+              </Link>
+              <Link to="/charts" style={{ marginLeft: 8, marginTop: 8 }}>
+                  <button>View charts</button>
+              </Link>
+               <Link to="/story" style={{ marginLeft: 8, marginTop: 8 }}>
+                  <button>🌷</button>
               </Link>
           </div>
           <p className="read-the-docs">
               By Ana Silva, Eduardo Zorzan, Gabriela Superti, Higor Milani, Lauro Ferneda, Maria Chehade
+          </p>
+           <p className="read-the-docs">
+              For the NASA Space Apps Challenge 2025
           </p>
       </div>
     </>
