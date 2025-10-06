@@ -12,6 +12,7 @@ import { useInViewIO } from './story/useInViewIO.js';
 import { useNoPetalsIO } from './story/useNoPetalsIO.js';
 import { useStoryActiveClasses } from './story/useStoryActiveClasses.js';
 import { useHideCursorOnSection } from './story/useHideCursorOnSection.js';
+import bgAudio from '../../assets/audio.mp3'; // novo: usa bundler para funcionar no GH Pages
 
 const Story = () => {
   // Ativa overrides globais somente nesta página
@@ -41,8 +42,8 @@ const Story = () => {
     <>
       {/* Canvas único e fixo para compartilhar pétalas entre sessões */}
       <PetalsCanvas />
-        <audio src="/assets/audio.mp3" autoPlay loop />
-        <Player />
+      <audio src={bgAudio} autoPlay loop /> {/* antes: "/assets/audio.mp3" */}
+      <Player />
 
       <section className="story-hero story-section" aria-label="Florecendo Ideias">
         <div className="section-content" style={{ padding: '0 16px', maxWidth: 1100, margin: '0 auto' }}>

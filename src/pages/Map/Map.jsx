@@ -469,7 +469,7 @@ export default function MapPage() {
         <div style="min-width:180px">
           <div style="font-weight:600;margin-bottom:4px">${escapeHtml(p.label || '(sem rótulo)')}</div>
           <div style="font-size:12px;color:#64748b;margin-bottom:6px">${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}</div>
-          <a href="/${encodeURIComponent(p.slug)}"
+          <a href="#/${encodeURIComponent(p.slug)}"
              style="display:inline-block;padding:4px 8px;border:1px solid #e5e7eb;border-radius:6px;background:#f8fafc;text-decoration:none;color:#111827">
              See details
           </a>
@@ -536,7 +536,7 @@ export default function MapPage() {
             <div style="min-width:180px">
               <div style="font-weight:600;margin-bottom:4px">${escapeHtml(doc.label?.trim() || '(sem rótulo)')}</div>
               <div style="font-size:12px;color:#64748b;margin-bottom:6px">${doc.lat.toFixed(5)}, ${doc.lng.toFixed(5)}</div>
-              <a href="/${encodeURIComponent(doc.slug)}"
+              <a href="#/${encodeURIComponent(doc.slug)}"
                  style="display:inline-block;padding:4px 8px;border:1px solid #e5e7eb;border-radius:6px;background:#f8fafc;text-decoration:none;color:#111827">
                  see details
               </a>
@@ -672,7 +672,7 @@ export default function MapPage() {
       <div style="min-width:180px">
         <div style="font-weight:600;margin-bottom:4px">${escapeHtml(doc.label?.trim() || '(sem rótulo)')}</div>
         <div style="font-size:12px;color:#64748b;margin-bottom:6px">${doc.lat.toFixed(5)}, ${doc.lng.toFixed(5)}</div>
-        <a href="/${encodeURIComponent(doc.slug)}"
+        <a href="#/${encodeURIComponent(doc.slug)}"
            style="display:inline-block;padding:4px 8px;border:1px solid #e5e7eb;border-radius:6px;background:#f8fafc;text-decoration:none;color:#111827">
            see details
         </a>
