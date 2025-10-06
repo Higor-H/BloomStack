@@ -87,11 +87,12 @@ Pull requests are welcome! For major changes, please open an issue first to disc
 
 
 ## 👥 Authors
-- [Higor-H](https://github.com/Higor-H)
+- [Ana Luisa Silca do Amaral](https://github.com/Analu-Silva)
 - [Eduardo Zorzan](https://github.com/eduardozorzan)
-- [MariaChehade](https://github.com/MariaChehade)
-- [Lauro D. Ferneda](https://github.com/LauroDF)
 - [Gabriela Superti](https://github.com/gabrielasuperti)
+- [Higor-H](https://github.com/Higor-H)
+- [Lauro D. Ferneda](https://github.com/LauroDF)
+- [MariaChehade](https://github.com/MariaChehade)
 
 ---
 
