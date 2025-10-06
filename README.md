@@ -1,9 +1,9 @@
 
-# FloraQuest
+# 🌸 FloraQuest 
 
 FloraQuest is a modern web application for plant recognition, environmental data visualization, and interactive storytelling. Built with React and Vite, it leverages machine learning models for plant identification and provides a rich user experience with maps, charts, and camera integration.
 
-## Features
+## 🗺️ Features
 
 - **Plant Recognition**: Identify plants using on-device ML models (TFLite) and a simple camera interface.
 - **Interactive Map**: Visualize geolocated data points and environmental layers.
@@ -11,7 +11,7 @@ FloraQuest is a modern web application for plant recognition, environmental data
 - **Story Mode**: Engage with educational stories about nature and biodiversity.
 - **Feed**: Browse recent activity and discoveries.
 
-## Project Structure
+## 🐝 Project Structure
 
 ```
 projeto/BloomStack/
@@ -39,13 +39,13 @@ projeto/BloomStack/
 └── data/
 ```
 
-## Getting Started
+## 🚦 Getting Started
 
-### Prerequisites
+### 💻 Prerequisites
 - Node.js (v16 or higher recommended)
 - npm or yarn
 
-### Installation
+### ⚙️ Installation
 
 1. Clone the repository:
 	```bash
@@ -66,30 +66,31 @@ projeto/BloomStack/
 	```
 4. Open [http://localhost:5173](http://localhost:5173) in your browser.
 
-## Usage
+## 🧭 Usage
 - Use the navigation menu to explore features: Map, Camera, Charts, Feed, Story, and About.
 - Try the Camera page to identify plants using your device's camera.
 - Explore the Map and Charts for environmental data.
 
-## Machine Learning Models
+## 🤖 Machine Learning Models
 - TFLite models for plant recognition are located in `public/models/`.
 - Labels and model files are included for both plant detection and recognition.
 
-## Folder Overview
+## 🗂️ Folder Overview
 - `src/pages/` — Main application pages (Map, Camera, Charts, Feed, Story, About, Point)
 - `src/services/` — Service modules for ML, map layers, and storage
 - `src/api/` — API integration
 - `public/models/` — ML models and label files
 - `data/` — Sample datasets
 
-## Contributing
+## 💬 Contributing
 Pull requests are welcome! For major changes, please open an issue first to discuss what you would like to change.
 
 
-## Authors
+## 👥 Authors
 - [Higor-H](https://github.com/Higor-H)
 - [Eduardo Zorzan](https://github.com/eduardozorzan)
 - [MariaChehade](https://github.com/MariaChehade)
+- [Lauro D. Ferneda](https://github.com/LauroDF)
 
 ---
 
