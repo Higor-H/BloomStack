@@ -11,6 +11,9 @@ FloraQuest is a modern web application for plant recognition, environmental data
 - **Story Mode**: Engage with educational stories about nature and biodiversity.
 - **Feed**: Browse recent activity and discoveries.
 
+## 💻 Test Now
+- Site: [FloraQuest](https://higor-h.github.io/BloomStack/#/)
+
 ## 🐝 Project Structure
 
 ```
