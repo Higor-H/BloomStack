@@ -91,6 +91,7 @@ Pull requests are welcome! For major changes, please open an issue first to disc
 - [Eduardo Zorzan](https://github.com/eduardozorzan)
 - [MariaChehade](https://github.com/MariaChehade)
 - [Lauro D. Ferneda](https://github.com/LauroDF)
+- [Gabriela Superti](https://github.com/gabrielasuperti)
 
 ---
 
