@@ -26,8 +26,8 @@ const Story = () => {
 
   useHideCursorOnSection('trees'); // faz cursor sumir nessa seção
 
-  function scrollToNext() {
-    const el = document.getElementById('about');
+  function scrollToNext(nextId) {
+    const el = document.getElementById(nextId)
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
@@ -54,7 +54,7 @@ const Story = () => {
             </p>
           </div>
         </div>
-        <div className="scroll-indicator" onClick={scrollToNext} role="button" aria-label="Ir para a próxima seção">
+        <div className="scroll-indicator" onClick={() => scrollToNext('about')} role="button" aria-label="Ir para a próxima seção">
           <span>Next page</span>
           <span className="scroll-indicator__arrow" aria-hidden="true" />
         </div>
@@ -71,6 +71,10 @@ const Story = () => {
               According to Yoseline Angel, a scientist at the University of Maryland-College Park and <span style={{ fontWeight: 800 }}>🚀 NASA</span> Goddard Space Flight Center in Greenbelt, Maryland, studies on <span style={{ fontWeight: 700 }}>flowering</span> can support farmers and natural resource managers who depend on these species, as well as the insects and other <span style={{ fontWeight: 700 }}>pollinators</span> that accompany them. Fruits, oilseeds, various <span style={{ fontWeight: 800 }}>medicines</span>, and cotton are some of the products derived from flowering plants.
             </p>
           </div>
+        </div>
+        <div className="scroll-indicator" onClick={() => scrollToNext('polen')} role="button" aria-label="Ir para a próxima seção">
+          <span>Next page</span>
+          <span className="scroll-indicator__arrow" aria-hidden="true" />
         </div>
       </section>
 
@@ -89,6 +93,10 @@ const Story = () => {
         </div>
         {/* campo interativo de abelhas/pólen */}
         <BeeField activeSectionId="polen" />
+        <div className="scroll-indicator" onClick={() => scrollToNext('trees')} role="button" aria-label="Ir para a próxima seção">
+          <span>Next page</span>
+          <span className="scroll-indicator__arrow" aria-hidden="true" />
+        </div>
       </section>
 
       <section id="trees" className="trees story-section" aria-label="Galhos e flores">

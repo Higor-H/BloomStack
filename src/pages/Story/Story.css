@@ -157,7 +157,6 @@ body.story-active #root {
 
 /* Indicador de scroll (para próxima seção) */
 .scroll-indicator {
-  position: absolute;
   left: 50%;
   bottom: 18px;
   transform: translateX(-50%);
@@ -176,6 +175,7 @@ body.story-active #root {
   animation: bounce 1.8s ease-in-out infinite;
   z-index: 2;
 }
+
 .scroll-indicator__arrow {
   width: 10px; height: 10px;
   border-right: 2px solid #e2e8f0;
