@@ -125,7 +125,7 @@ export default function ChartsPage() {
     // top espécies
     const map = new Map()
     for (const p of points) {
-      const key = norm(p.scientificName) || '(sem nome)'
+      const key = norm(p.scientificName) || '(unknown)'
       map.set(key, (map.get(key) || 0) + 1)
     }
     const speciesTop = [...map.entries()].map(([label, value]) => ({ label, value }))
