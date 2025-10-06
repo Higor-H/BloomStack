@@ -87,7 +87,7 @@ Pull requests are welcome! For major changes, please open an issue first to disc
 
 
 ## 👥 Authors
-- [Ana Luisa Silca do Amaral](https://github.com/Analu-Silva)
+- [Ana Luisa Silva do Amaral](https://github.com/Analu-Silva)
 - [Eduardo Zorzan](https://github.com/eduardozorzan)
 - [Gabriela Superti](https://github.com/gabrielasuperti)
 - [Higor-H](https://github.com/Higor-H)
